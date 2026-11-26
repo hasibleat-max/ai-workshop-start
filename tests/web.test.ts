@@ -551,7 +551,7 @@ test('the look: each text on the background its contrast is checked on; hierarch
   const sizes = new Set([...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1])));
   assert.deepEqual([...sizes].sort((a, b) => a - b), [12, 13, 14, 16, 20]);
   // Spacing in multiples of 4 px; corners 6 px, 8 px for the SKILL.md text and the empty pane's outline, 2–4 px on small details.
-  for (const [, property, value] of css.matchAll(/(margin(?:-\w+)?|padding|gap):\s*([^;]+);/g)) {
+  for (const [, property, value] of css.matchAll(/(margin(?:-\w+)?|padding(?:-\w+)?|gap):\s*([^;]+);/g)) {
     for (const [, px] of value.matchAll(/(\d+)px/g)) assert.equal(Number(px) % 4, 0, `${property}: ${value}`);
   }
   assert.match(css, /--radius:\s*6px;/);
