@@ -181,8 +181,7 @@ const PAGE = `<!doctype html>
     body { height: auto; min-height: 100vh; }
     header { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
     main { grid-template-columns: 1fr; }
-    #list { border-right: 0; border-bottom: 1px solid var(--border); }
-    #skills { max-height: 50vh; }
+    #list { max-height: 50vh; border-right: 0; border-bottom: 1px solid var(--border); }
     #skill { overflow: visible; padding: 16px; }
   }
   @media (prefers-reduced-motion: reduce) {

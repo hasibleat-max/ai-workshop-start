@@ -37,13 +37,13 @@ A modern developer tool: calm, one accent, light and dark. The page's look only;
   | Property | Light | Dark | For |
   | --- | --- | --- | --- |
   | `--bg` | `#ffffff` | `#0d1117` | the page, the SKILL.md pane, the fields |
-  | `--surface` | `#f6f8fa` | `#151b23` | the list's column, the SKILL.md text, a disabled field or button |
+  | `--surface` | `#f6f8fa` | `#151b23` | the header, the list's column, the SKILL.md text, a disabled field or button |
   | `--hover` | `#eaeef2` | `#212830` | the skill under the pointer |
   | `--selected` | `#ddf4ff` | `#14263d` | the selected skill, with a bar of `--accent` at its left |
   | `--text` | `#1f2328` | `#e6edf3` | text, skill names |
   | `--muted` | `#59636e` | `#9198a1` | descriptions, paths, the status, the counter, placeholders, what is disabled |
-  | `--border` | `#818b98` | `#656c76` | the fields' borders, the rules |
-  | `--accent` | `#0969da` | `#4493f8` | the one accent: the Scan button, links, focus rings, the spinner, the square before the name |
+  | `--border` | `#818b98` | `#656c76` | the fields' borders (`--muted` under the pointer), the rules, the spinner's track |
+  | `--accent` | `#0969da` | `#4493f8` | the one accent: the Scan button, links, focus rings, the spinner, the square before the page's name |
   | `--accent-hover` | `#0858b9` | `#6cb6ff` | the Scan button under the pointer |
   | `--on-accent` | `#ffffff` | `#0d1117` | the Scan button's text |
   | `--mark` / `--on-mark` | `#fff1a8` / `#1f2328` | `#e3b341` / `#0d1117` | `<mark>`: what the filter found |
@@ -56,7 +56,8 @@ A modern developer tool: calm, one accent, light and dark. The page's look only;
 - **Type**: the system's sans-serif (`system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`);
   monospace (`ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace`) only for the SKILL.md text and
   what the filter found. Sizes 12, 13, 14, 16 and 20 px: skill names 14 px semibold in `--text`, descriptions 13 px and
-  paths 12 px in `--muted`. Spacing in multiples of 4 px; corners 6 px, 8 px for the SKILL.md text; no prompts, brackets or
+  paths 12 px in `--muted`. Spacing in multiples of 4 px; corners 6 px, 8 px for the SKILL.md text and
+  the empty pane's outline, 2–4 px on small details; no prompts, brackets or
   generated text: the texts are the page's own
 - **States**: hover (`--hover`, the button `--accent-hover`); focus, a 2px `--accent` outline on every field, button,
   skill and link; selected (`--selected` and its bar); disabled (`--muted` on `--surface`, no pointer); the empty

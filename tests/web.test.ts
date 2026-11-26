@@ -511,8 +511,7 @@ test('the look: in light and in dark, every text at least 4.5:1 on its backgroun
       ['danger', 'danger-bg', 4.5], // an error
       ['border', 'bg', 3], // the fields' borders, the rules
       ['border', 'surface', 3],
-      ['accent', 'bg', 3], // focus rings, wherever they are
-      ['accent', 'surface', 3],
+      ['accent', 'surface', 3], // focus rings, wherever they are (on --bg: above, 4.5:1)
       ['accent', 'hover', 3],
       ['accent', 'selected', 3], // and the selected skill's bar
     ] as const) {
@@ -522,27 +521,58 @@ test('the look: in light and in dark, every text at least 4.5:1 on its backgroun
   }
 });
 
-test('the look: hierarchy and states; focus visible on every field, button, skill and link', async () => {
+test('the look: each text on the background its contrast is checked on; hierarchy and states; focus visible everywhere', async () => {
   const css = await stylesheet();
-  const rule = (selector: string) => new RegExp(selector.replace(/[.#[\]()]/g, '\\$&') + '\\s*\\{([^}]*)\\}').exec(css)?.[1] ?? '';
-  assert.match(rule('.name'), /font-weight:\s*600;/);
-  assert.match(rule('.name'), /color:\s*var\(--text\);/);
-  assert.match(rule('.description'), /color:\s*var\(--muted\);/);
-  assert.match(rule('.path'), /color:\s*var\(--muted\);/);
+  const rule = (selector: string) => {
+    const found = new RegExp('(?:^|\\})\\s*' + selector.replace(/[.#[\]()*]/g, '\\$&') + '\\s*\\{([^}]*)\\}').exec(css);
+    assert.ok(found, `a rule for ${selector}`);
+    return found[1];
+  };
+  // The backgrounds: the header and the list's column on --surface, the fields and the pane on --bg.
+  assert.match(rule('body'), /background:\s*var\(--bg\);\s*color:\s*var\(--text\);/);
+  assert.match(rule('header'), /background:\s*var\(--surface\);/);
+  assert.match(rule('#list'), /background:\s*var\(--surface\);/);
+  assert.match(rule('input'), /background:\s*var\(--bg\);\s*color:\s*var\(--text\);/);
+  assert.match(rule('.field'), /background:\s*var\(--bg\);/);
+  assert.match(rule('#skill pre'), /background:\s*var\(--surface\);/);
+  // The texts on them.
+  assert.match(rule('input::placeholder'), /color:\s*var\(--muted\);/);
+  assert.match(rule('#status'), /color:\s*var\(--muted\);/);
+  assert.match(rule('#counter'), /color:\s*var\(--muted\);/);
+  assert.doesNotMatch(rule('#counter'), /display:/, 'the hidden attribute still hides the counter');
+  assert.match(rule('#skill a'), /color:\s*var\(--accent\);/);
+  assert.match(rule('button'), /background:\s*var\(--accent\);\s*color:\s*var\(--on-accent\);/);
+  // Hierarchy: names stand out, descriptions and paths recede.
+  assert.match(rule('.name'), /font-size:\s*14px;\s*font-weight:\s*600;\s*color:\s*var\(--text\);/);
+  assert.match(rule('.description'), /font-size:\s*13px;\s*color:\s*var\(--muted\);/);
+  assert.match(rule('.path'), /font-size:\s*12px;\s*color:\s*var\(--muted\);/);
+  assert.match(rule('h1'), /font-size:\s*16px;/);
+  assert.match(rule('#skill h2'), /font-size:\s*20px;/);
+  const sizes = new Set([...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1])));
+  assert.deepEqual([...sizes].sort((a, b) => a - b), [12, 13, 14, 16, 20]);
+  // Spacing in multiples of 4 px; corners 6 px, 8 px for the SKILL.md text and the empty pane's outline, 2–4 px on small details.
+  for (const [, property, value] of css.matchAll(/(margin(?:-\w+)?|padding|gap):\s*([^;]+);/g)) {
+    for (const [, px] of value.matchAll(/(\d+)px/g)) assert.equal(Number(px) % 4, 0, `${property}: ${value}`);
+  }
+  assert.match(css, /--radius:\s*6px;/);
+  assert.match(rule('#skill pre'), /border-radius:\s*8px;/);
+  for (const [, value] of css.matchAll(/border-radius:\s*([^;]+);/g)) assert.match(value, /^(var\(--radius\)|50%|0|[248]px)$/, value);
+  // States.
   assert.match(rule('#skills li:hover'), /background:\s*var\(--hover\);/);
-  assert.match(rule('#skills li[aria-selected="true"]'), /background:\s*var\(--selected\);[^}]*box-shadow:\s*inset 3px 0 0 var\(--accent\);/);
+  assert.match(rule('#skills li[aria-selected="true"]'), /background:\s*var\(--selected\);\s*box-shadow:\s*inset 3px 0 0 var\(--accent\);/);
   assert.match(rule('mark'), /background:\s*var\(--mark\);\s*color:\s*var\(--on-mark\);/);
-  assert.match(rule('input:disabled'), /background:\s*var\(--surface\);\s*color:\s*var\(--muted\);/);
-  assert.match(rule('button:disabled'), /background:\s*var\(--surface\);\s*color:\s*var\(--muted\);/);
+  assert.match(rule('input:disabled'), /background:\s*var\(--surface\);\s*color:\s*var\(--muted\);\s*cursor:\s*not-allowed;/);
+  assert.match(rule('.field:has(#filter:disabled)'), /background:\s*var\(--surface\);/);
+  assert.match(rule('button:disabled'), /background:\s*var\(--surface\);\s*color:\s*var\(--muted\);[^}]*cursor:\s*not-allowed;/);
   assert.match(rule('button:hover'), /background:\s*var\(--accent-hover\);/);
+  assert.match(rule('#repo:hover'), /border-color:\s*var\(--muted\);/);
   assert.match(rule('#warnings li'), /background:\s*var\(--warning-bg\);\s*color:\s*var\(--warning\);/);
   assert.match(rule('#status.error'), /background:\s*var\(--danger-bg\);\s*color:\s*var\(--danger\);/);
-  assert.match(rule('.empty'), /color:\s*var\(--muted\);[^}]*text-align:\s*center;/);
+  assert.match(rule('.empty'), /color:\s*var\(--muted\);\s*text-align:\s*center;/);
+  assert.match(rule('.empty::before'), /border:\s*2px dashed var\(--border\);/);
   for (const selector of ['#repo:focus-visible', '.field:focus-within', 'button:focus-visible', '#skills li:focus-visible', '#skill a:focus-visible']) {
     assert.match(rule(selector), /outline:\s*2px solid var\(--accent\)/, selector);
   }
-  // The counter's hidden attribute still hides it.
-  assert.doesNotMatch(rule('#counter'), /display:/);
 });
 
 test('the look: nothing from outside; system fonts, monospace only for the SKILL.md text and what the filter found; no CRT', async () => {
@@ -599,7 +629,7 @@ test('the look: under 720 px wide, the list above the SKILL.md pane, and the pag
   assert.ok(narrow, 'a rule for narrow windows');
   assert.match(narrow[1], /body\s*\{[^}]*height:\s*auto;/);
   assert.match(narrow[1], /main\s*\{[^}]*grid-template-columns:\s*1fr;/);
-  assert.match(narrow[1], /#skills\s*\{[^}]*max-height:\s*50vh;/);
+  assert.match(narrow[1], /#list\s*\{[^}]*max-height:\s*50vh;/);
   // The list comes first in the page, so in one column it is above the pane.
   const shown = await load();
   assert.equal(shown.$('list').nextElementSibling, shown.$('skill'));
