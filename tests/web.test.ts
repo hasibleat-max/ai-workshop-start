@@ -15,9 +15,9 @@ import { replay } from '../src/core/replay.ts';
 import type { Source } from '../src/core/scan.ts';
 import { openDirectory } from '../src/local.ts';
 import { createWebServer, startWebServer, type WebScan } from '../src/web.ts';
-import { ABBREVIATIONS, CLI, EXAMPLE, EXAMPLE_COMMIT, FIXTURE } from './helpers.ts';
+import { ABBREVIATIONS, CLI, EXAMPLE, EXAMPLE_COMMIT, FIXTURE, INDENTED } from './helpers.ts';
 
-const github = replay({ ...EXAMPLE, ...ABBREVIATIONS });
+const github = replay({ ...EXAMPLE, ...ABBREVIATIONS, ...INDENTED });
 const open = (input: string) => (parseGitHubUrl(input) ? openGitHub(input, { fetch: github, token: 'test' }) : openDirectory(input));
 
 /** A server on a free port; closed after the tests. */
@@ -32,8 +32,8 @@ const base = await listen();
 const port = new URL(base).port;
 const scanned = (repo: string) => fetch(`${base}/api/scan?repo=${encodeURIComponent(repo)}`);
 
-/** The page, its script running in a DOM against the server: what it shows after scanning `repo`. */
-async function page(repo: string) {
+/** The page, its script running in a DOM against the server. */
+async function load() {
   const dom = new JSDOM(await (await fetch(`${base}/`)).text(), {
     url: `${base}/`,
     runScripts: 'dangerously',
@@ -41,23 +41,59 @@ async function page(repo: string) {
   });
   const document = dom.window.document;
   const $ = (id: string) => document.getElementById(id)!;
-  ($('repo') as HTMLInputElement).value = repo;
-  $('go').click();
-  for (const start = Date.now(); ($('go') as HTMLButtonElement).disabled || $('status').textContent!.startsWith('Scanning'); ) {
-    if (Date.now() - start > 5000) throw new Error('the page did not finish scanning');
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
   const text = (element: Element) => element.textContent;
-  return {
+  const marks = (element: Element) => [...element.querySelectorAll('mark')].map(text);
+  const view = {
     $,
-    status: $('status').textContent,
-    error: $('status').className === 'error',
-    warnings: [...$('warnings').children].map(text),
-    skills: [...$('skills').children].map((item) => [...item.children].map(text)),
+    window: dom.window,
+    /** Scans `repo` as a user would: types it and presses Scan, then waits for the answer. */
+    async scan(repo: string) {
+      ($('repo') as HTMLInputElement).value = repo;
+      $('go').click();
+      for (const start = Date.now(); ($('go') as HTMLButtonElement).disabled || $('status').textContent!.startsWith('Scanning'); ) {
+        if (Date.now() - start > 5000) throw new Error('the page did not finish scanning');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      return view;
+    },
+    /** Types `value` into the filter. */
+    filter(value: string) {
+      const field = $('filter') as HTMLInputElement;
+      field.value = value;
+      field.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+      return view;
+    },
+    get filterField() {
+      return $('filter') as HTMLInputElement;
+    },
+    get status() {
+      return $('status').textContent;
+    },
+    get error() {
+      return $('status').className === 'error';
+    },
+    get warnings() {
+      return [...$('warnings').children].map(text);
+    },
+    get skills() {
+      return [...$('skills').children].map((item) => [...item.children].map(text));
+    },
+    /** Each skill shown: its name, and the marked parts of what the filter found. */
+    get found() {
+      return [...$('skills').children].map((item) => [item.querySelector('.name')!.textContent, marks(item)]);
+    },
     selected: () => [...$('skill').children].map((element) => ({ tag: element.tagName, text: element.textContent, href: element.getAttribute('href') })),
+    /** The marked parts of the SKILL.md pane. */
+    get selectedMarks() {
+      return marks($('skill'));
+    },
     pick: (index: number) => ($('skills').children[index] as HTMLElement).click(),
   };
+  return view;
 }
+
+/** What the page shows after scanning `repo`. */
+const page = async (repo: string) => (await load()).scan(repo);
 
 test('the page: the skills sorted by name, with first sentence and path; the first one selected; warnings under the field', async () => {
   const shown = await page(FIXTURE);
@@ -223,4 +259,144 @@ test('the CLI: serve prints the address and the page answers there until stopped
   assert.ok(match, line);
   const answer = (await (await fetch(`${match[1]}api/scan?repo=${encodeURIComponent(FIXTURE)}`)).json()) as WebScan;
   assert.equal(answer.skills.length, 5);
+});
+
+const FIXTURE_SKILLS = ['code-style', 'commits', 'pull-requests', 'release-checklist', 'run-tests'];
+const names = (shown: { skills: (string | null)[][] }) => shown.skills.map((item) => item[0]);
+const fixtureText = (path: string) => readFileSync(join(FIXTURE, path), 'utf8');
+
+test('the filter: disabled until a scan finds skills; a new scan clears it', async () => {
+  const shown = await load();
+  assert.equal(shown.filterField.disabled, true);
+  await shown.scan(FIXTURE);
+  assert.equal(shown.filterField.disabled, false);
+  shown.filter('commit');
+  assert.equal(shown.status, 'fixture · 2 of 5 skills');
+  await shown.scan(FIXTURE);
+  assert.equal(shown.filterField.value, '');
+  assert.equal(shown.status, 'fixture · 5 skills');
+  assert.deepEqual(names(shown), FIXTURE_SKILLS);
+  shown.filter('commit');
+  await shown.scan(join(FIXTURE, 'docs'));
+  assert.equal(shown.status, 'docs · 0 skills');
+  assert.equal(shown.filterField.value, '');
+  assert.equal(shown.filterField.disabled, true);
+  await shown.scan(FIXTURE);
+  shown.filter('commit');
+  await shown.scan(join(FIXTURE, 'no-such-directory'));
+  assert.equal(shown.error, true);
+  assert.equal(shown.filterField.value, '');
+  assert.equal(shown.filterField.disabled, true);
+});
+
+test('the filter: empty → all five skills, the status as without a filter, nothing marked', async () => {
+  const shown = (await page(FIXTURE)).filter('commit').filter('');
+  assert.equal(shown.status, 'fixture · 5 skills');
+  assert.deepEqual(shown.skills, [
+    ['code-style', "Follow the project's code style.", '.github/skills/code-style/SKILL.md'],
+    ['commits', 'Write commit messages the way this repository does.', '.claude/skills/commits/SKILL.md'],
+    ['pull-requests', 'Open pull requests the way this repository does.', '.agents/skills/pull-requests/SKILL.md'],
+    ['release-checklist', '', '.agents/skills/release-checklist/SKILL.md'],
+    ['run-tests', 'Run the tests the way CI does.', 'agent/skills/run-tests/SKILL.md'],
+  ]);
+  assert.deepEqual(shown.selectedMarks, []);
+  shown.filter('   ');
+  assert.equal(shown.status, 'fixture · 5 skills');
+  assert.deepEqual(names(shown), FIXTURE_SKILLS);
+});
+
+test('the filter: commit → code-style, found in its description, and commits; every match in the pane marked', async () => {
+  const shown = (await page(FIXTURE)).filter('commit');
+  assert.equal(shown.status, 'fixture · 2 of 5 skills');
+  assert.deepEqual(shown.skills, [
+    [
+      'code-style',
+      "Follow the project's code style.",
+      '.github/skills/code-style/SKILL.md',
+      "description: Follow the project's code style. Use before committing Kotlin or Java changes.",
+    ],
+    ['commits', 'Write commit messages the way this repository does.', '.claude/skills/commits/SKILL.md', 'name: commits'],
+  ]);
+  assert.deepEqual(shown.found, [
+    ['code-style', ['commit']],
+    ['commits', ['commit']],
+  ]);
+  // code-style, selected by the scan, still matches.
+  assert.equal(shown.selected()[0]!.text, 'code-style');
+  assert.equal(shown.selected().at(-1)!.text, fixtureText('.github/skills/code-style/SKILL.md'));
+  assert.deepEqual(shown.selectedMarks, ['commit']);
+  shown.pick(1);
+  assert.equal(shown.selected().at(-1)!.text, fixtureText('.claude/skills/commits/SKILL.md'));
+  assert.deepEqual(shown.selectedMarks, ['commit', 'commit', 'commit', 'Commit']);
+});
+
+test('the filter: TABS, ignoring case and the spaces around it → code-style, "no tabs" marked', async () => {
+  const shown = (await page(FIXTURE)).filter('  TABS ');
+  assert.equal(shown.status, 'fixture · 1 of 5 skills');
+  assert.deepEqual(shown.skills, [
+    ['code-style', "Follow the project's code style.", '.github/skills/code-style/SKILL.md', '- Four spaces, no tabs; lines up to 120 characters.'],
+  ]);
+  assert.deepEqual(shown.found, [['code-style', ['tabs']]]);
+  assert.deepEqual(shown.selectedMarks, ['tabs']);
+});
+
+test('the filter: .agents/ → pull-requests and release-checklist by path, no line, nothing marked; not by a copy\'s path', async () => {
+  const shown = (await page(FIXTURE)).filter('.agents/');
+  assert.equal(shown.status, 'fixture · 2 of 5 skills');
+  assert.deepEqual(shown.skills, [
+    ['pull-requests', 'Open pull requests the way this repository does.', '.agents/skills/pull-requests/SKILL.md'],
+    ['release-checklist', '', '.agents/skills/release-checklist/SKILL.md'],
+  ]);
+  assert.equal(shown.selected()[0]!.text, 'pull-requests');
+  assert.deepEqual(shown.selectedMarks, []);
+  // Only the path the skill links to, not its copies': pull-requests is also in .claude/skills.
+  shown.filter('.claude/');
+  assert.equal(shown.status, 'fixture · 1 of 5 skills');
+  assert.deepEqual(names(shown), ['commits']);
+});
+
+test('the filter: no-such-skill → no skills, a message in the pane; .* is text, not a pattern', async () => {
+  const shown = (await page(FIXTURE)).filter('no-such-skill');
+  assert.equal(shown.status, 'fixture · 0 of 5 skills');
+  assert.deepEqual(shown.skills, []);
+  assert.deepEqual(shown.selected(), [{ tag: 'P', text: 'No skills match "no-such-skill".', href: null }]);
+  // The filter is text, not a pattern.
+  shown.filter('.*');
+  assert.equal(shown.status, 'fixture · 0 of 5 skills');
+});
+
+test('the filter: the selected skill stays while it matches, else the first skill shown', async () => {
+  const shown = await page(FIXTURE);
+  shown.pick(1);
+  shown.filter('commit');
+  assert.equal(shown.selected()[0]!.text, 'commits');
+  assert.equal(shown.$('skills').children[1]!.getAttribute('aria-selected'), 'true');
+  shown.filter('tabs');
+  assert.equal(shown.selected()[0]!.text, 'code-style');
+  assert.equal(shown.$('skills').children[0]!.getAttribute('aria-selected'), 'true');
+  shown.filter('');
+  assert.equal(shown.selected()[0]!.text, 'code-style');
+  shown.pick(4);
+  shown.filter('no-such-skill').filter('');
+  assert.equal(shown.selected()[0]!.text, 'code-style');
+});
+
+test('the filter: one skill → 1 of 1 skill; what it found trimmed, every match in it marked, also with Windows line endings', async () => {
+  const shown = (await page('https://github.com/JetBrains/indented')).filter('linter');
+  assert.equal(shown.status, 'JetBrains/indented · 1 of 1 skill');
+  assert.deepEqual(shown.skills, [['lint', 'Lint the code.', '.claude/skills/lint/SKILL.md', 'Run the Linter, then fix what the linter says.']]);
+  assert.deepEqual(shown.found, [['lint', ['Linter', 'linter']]]);
+});
+
+test('the filter: nothing fetched, nothing stored', async () => {
+  const shown = await page(FIXTURE);
+  let fetched = 0;
+  const fetch = shown.window.fetch;
+  shown.window.fetch = (...args: Parameters<typeof fetch>) => (fetched++, fetch(...args));
+  shown.filter('commit');
+  assert.equal(fetched, 0);
+  assert.equal(shown.window.location.href, `${base}/`);
+  assert.equal(shown.window.localStorage.length, 0);
+  assert.equal(shown.window.sessionStorage.length, 0);
+  assert.equal(shown.filterField.autocomplete, 'off');
 });

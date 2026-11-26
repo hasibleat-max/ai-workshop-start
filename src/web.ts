@@ -107,12 +107,16 @@ const PAGE = `<!doctype html>
   #status.error { color: #e5484d; }
   #warnings { margin: 4px 0 0; padding-left: 20px; color: #d97706; }
   main { flex: 1; display: grid; grid-template-columns: minmax(240px, 1fr) 2fr; min-height: 0; }
-  #skills { list-style: none; margin: 0; padding: 0; overflow: auto; border-right: 1px solid var(--border); }
+  #list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+  #filter { flex: none; margin: 8px 16px; }
+  #skills { flex: 1; list-style: none; margin: 0; padding: 0; overflow: auto; border-top: 1px solid var(--border); }
   #skills li { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
   #skills li:hover { background: #8881; }
   #skills li[aria-selected="true"] { background: #3b82f622; box-shadow: inset 3px 0 var(--accent); }
   .name { font-weight: 600; }
   .description, .path { color: var(--muted); font-size: 12px; }
+  .found { font-size: 12px; font-family: ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; }
+  mark { background: #facc1566; color: inherit; }
   #skill { overflow: auto; padding: 16px; }
   #skill h2 { margin: 0 0 4px; font-size: 18px; }
   #skill a { color: var(--accent); word-break: break-all; }
@@ -131,7 +135,10 @@ const PAGE = `<!doctype html>
   <ul id="warnings"></ul>
 </header>
 <main>
-  <ul id="skills" role="listbox" aria-label="Skills"></ul>
+  <div id="list">
+    <input id="filter" type="search" placeholder="Filter the skills" aria-label="Filter the skills" autocomplete="off" disabled>
+    <ul id="skills" role="listbox" aria-label="Skills"></ul>
+  </div>
   <section id="skill" aria-label="SKILL.md"><p class="empty">Scan a repository, then pick a skill to read its SKILL.md.</p></section>
 </main>
 <script>
@@ -147,7 +154,29 @@ function status(text, error = false) {
   $('status').className = error ? 'error' : '';
 }
 
+// The last scan's answer and the selected skill's id; the filter only narrows what that answer has.
+let answer = null;
+let selected = null;
+// The filter as a case-insensitive pattern for its literal text; null when empty.
+let query = null;
+
+const has = (text) => text.search(query) !== -1;
+
+/** The text, each match of the filter in a <mark>. */
+function marked(text) {
+  if (!query) return [text];
+  const parts = [];
+  let last = 0;
+  for (const match of text.matchAll(query)) {
+    parts.push(text.slice(last, match.index), el('mark', { textContent: match[0] }));
+    last = match.index + match[0].length;
+  }
+  parts.push(text.slice(last));
+  return parts;
+}
+
 function show(skill) {
+  selected = skill.id;
   for (const item of $('skills').children) item.setAttribute('aria-selected', String(item.dataset.id === skill.id));
   // An http:// page cannot open a file:// link: a local skill's path is shown as text.
   const link = skill.link.startsWith('file:')
@@ -155,37 +184,58 @@ function show(skill) {
     : el('a', { href: skill.link, textContent: skill.link, target: '_blank', rel: 'noreferrer' });
   const parts = [el('h2', { textContent: skill.name }), link];
   if (skill.copies.length) parts.push(el('p', { className: 'path', textContent: 'also in ' + skill.copies.join(', ') }));
-  parts.push(el('pre', { textContent: skill.text }));
+  parts.push(el('pre', {}, ...marked(skill.text)));
   $('skill').replaceChildren(...parts);
 }
+
+/** The skills of the last scan that match the filter, its status, and the selected one's SKILL.md. */
+function render() {
+  const filter = $('filter').value.trim();
+  query = filter ? new RegExp(filter.replace(/[^\\w\\s]/g, '\\\\$&'), 'gi') : null;
+  const skills = query ? answer.skills.filter((skill) => has(skill.name) || has(skill.path) || has(skill.text)) : answer.skills;
+  const total = answer.skills.length;
+  status(answer.repository.id + ' · ' + (query ? skills.length + ' of ' : '') + total + (total === 1 ? ' skill' : ' skills'));
+  $('skills').replaceChildren(...skills.map((skill) => {
+    const item = el('li', { role: 'option', tabIndex: 0 },
+      el('div', { className: 'name', textContent: skill.name }),
+      el('div', { className: 'description', textContent: skill.summary }),
+      el('div', { className: 'path', textContent: skill.path }));
+    // What the filter found: its first line in the SKILL.md; none for a match in the path only.
+    const line = query && skill.text.split(/\\r?\\n/).find(has);
+    if (line) item.append(el('div', { className: 'found' }, ...marked(line.trim())));
+    item.dataset.id = skill.id;
+    item.addEventListener('click', () => show(skill));
+    item.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(skill); } });
+    return item;
+  }));
+  if (skills.length) return show(skills.find((skill) => skill.id === selected) ?? skills[0]);
+  selected = null;
+  const empty = total ? 'No skills match "' + filter + '".' : 'No project skills in this repository.';
+  $('skill').replaceChildren(el('p', { className: 'empty', textContent: empty }));
+}
+
+$('filter').addEventListener('input', render);
 
 $('scan').addEventListener('submit', async (event) => {
   event.preventDefault();
   const repo = $('repo').value.trim();
   $('go').disabled = true;
+  $('filter').value = '';
+  $('filter').disabled = true;
+  answer = null;
+  selected = null;
   $('skills').replaceChildren();
   $('warnings').replaceChildren();
   $('skill').replaceChildren(el('p', { className: 'empty', textContent: 'Scan a repository, then pick a skill to read its SKILL.md.' }));
   status('Scanning ' + repo + '…');
   try {
     const response = await fetch('/api/scan?repo=' + encodeURIComponent(repo));
-    const answer = await response.json();
-    if (!response.ok) return status(answer.error, true);
-    const count = answer.skills.length;
-    status(answer.repository.id + ' · ' + count + (count === 1 ? ' skill' : ' skills'));
+    const body = await response.json();
+    if (!response.ok) return status(body.error, true);
+    answer = body;
     $('warnings').replaceChildren(...answer.warnings.map((text) => el('li', { textContent: 'warning: ' + text })));
-    $('skills').replaceChildren(...answer.skills.map((skill) => {
-      const item = el('li', { role: 'option', tabIndex: 0 },
-        el('div', { className: 'name', textContent: skill.name }),
-        el('div', { className: 'description', textContent: skill.summary }),
-        el('div', { className: 'path', textContent: skill.path }));
-      item.dataset.id = skill.id;
-      item.addEventListener('click', () => show(skill));
-      item.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(skill); } });
-      return item;
-    }));
-    if (count) show(answer.skills[0]);
-    else $('skill').replaceChildren(el('p', { className: 'empty', textContent: 'No project skills in this repository.' }));
+    $('filter').disabled = answer.skills.length === 0;
+    render();
   } catch (error) {
     status('Cannot reach the Skill Atlas server: ' + error.message, true);
   } finally {
