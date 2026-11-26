@@ -35,6 +35,7 @@ open, then on the pull request. Post it once step 1 has not stopped you, and edi
 | Step 6, after each push | the pull request | `Waiting for CI and the review of <sha>` |
 | A review came | the pull request | `Addressing the review of <sha>: findings 1, 2 and 4` |
 | CI is red | the pull request | `CI failed on <sha>: fixing <what>` |
+| Step 7 | the pull request | `Recording the demo of <sha>` |
 
 - One at a time: edit it, do not post a second one.
 - Before you post any other comment (a question, the reply to a review, the result), delete it.
@@ -171,13 +172,20 @@ its number, `fixed in <sha>` or `not changed: <why>`, and post the status again:
 the review of the new commit.
 
 **Done** when CI is green for the final commit, per AGENTS.md, and the review of that commit says
-**ready**, with no blocking or should-fix findings. Delete the status comment and comment on the
-pull request: `Ready for a person to merge: CI is green for <sha> and its review says ready.` Under
-it, the ready review's nits: they stay for a person.
+**ready**, with no blocking or should-fix findings. Record the demo (step 7). Then delete the status
+comment and comment on the pull request: `Ready for a person to merge: CI is green for <sha> and its
+review says ready.` Under it, the demo, then the ready review's nits: they stay for a person.
 
 **Stop** after three red CI runs, or three reviews that are not ready: delete the status comment,
 comment on the pull request with what is left and what you tried, and leave it open for a person.
 The same when no review came: delete the status comment first.
+
+## 7. The demo
+
+Record it with [record-demo](../record-demo/SKILL.md), at the final commit, showing what the issue
+asks for. It gives the `### Demo` block for the ready comment, or one line that says why there is
+none. A demo never holds back a ready pull request: if recording fails, post the comment without it
+and say why in one line.
 
 ## Report
 
