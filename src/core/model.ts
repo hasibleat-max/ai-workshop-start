@@ -39,8 +39,11 @@ export function sortSkills(skills: Skill[]): Skill[] {
   return [...skills].sort((a, b) => compare(a.name, b.name) || compare(a.path, b.path));
 }
 
-/** A description's first sentence, on one line: what `scan` prints and the web view lists. */
+/**
+ * A description's first sentence, on one line: what `scan` prints and the web view lists.
+ * The dot of an abbreviation such as `e.g.` or `i.e.` does not end it.
+ */
 export function firstSentence(text: string): string {
   const line = text.replace(/\s+/g, ' ').trim();
-  return /^.*?[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
+  return /^.*?(?<!(?:^|\s)(?:[a-z]\.)+[a-z])[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
 }

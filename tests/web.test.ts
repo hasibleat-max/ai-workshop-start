@@ -15,9 +15,9 @@ import { replay } from '../src/core/replay.ts';
 import type { Source } from '../src/core/scan.ts';
 import { openDirectory } from '../src/local.ts';
 import { createWebServer, startWebServer, type WebScan } from '../src/web.ts';
-import { CLI, EXAMPLE, EXAMPLE_COMMIT, FIXTURE } from './helpers.ts';
+import { ABBREVIATIONS, CLI, EXAMPLE, EXAMPLE_COMMIT, FIXTURE } from './helpers.ts';
 
-const github = replay(EXAMPLE);
+const github = replay({ ...EXAMPLE, ...ABBREVIATIONS });
 const open = (input: string) => (parseGitHubUrl(input) ? openGitHub(input, { fetch: github, token: 'test' }) : openDirectory(input));
 
 /** A server on a free port; closed after the tests. */
@@ -96,6 +96,14 @@ test('the page: a GitHub skill links to its SKILL.md at the scanned commit', asy
   assert.deepEqual(shown.selected().slice(0, 2), [
     { tag: 'H2', text: 'commits', href: null },
     { tag: 'A', text: link, href: link },
+  ]);
+});
+
+test('the page: the first sentence does not end at an abbreviation such as e.g. or i.e.', async () => {
+  const shown = await page('https://github.com/JetBrains/abbreviations');
+  assert.deepEqual(shown.skills, [
+    ['a', 'Use e.g. for this.', '.claude/skills/a/SKILL.md'],
+    ['b', 'Build tools, i.e. Gradle or Maven.', '.claude/skills/b/SKILL.md'],
   ]);
 });
 
