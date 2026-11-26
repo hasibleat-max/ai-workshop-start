@@ -29,3 +29,21 @@ Listens on **127.0.0.1 only**, and answers only `Host: 127.0.0.1:<port>` or `loc
 `link`, `copies`, `text`), `warnings`.
 A clear message (an unreachable repository, an empty field) → `{ "error": <message> }`, status 400;
 any other error is a bug → status 500. `GET /` is the page; another path → 404, another method → 405.
+## The look
+A retro CRT terminal, green phosphor on black: the page's look only; what it does and says stays as above.
+- **Palette**, custom properties on `:root`, dark only (`color-scheme: dark`): `--bg` `#0a0f0a` (the page),
+  `--fg` `#33ff66` (text; the selected skill's background), `--dim` `#1fa84a` (paths, descriptions, the status,
+  the counter, placeholders), `--line` `#1f7a3a` (borders and rules), `--hover` `#0f2a17` (the skill under the pointer),
+  `--amber` `#ffb000` (warnings; `<mark>`: `--bg` on `--amber`), `--red` `#ff5555` (errors), `--inverse-dim` `#0a3d1a`
+  (the selected skill's description and path)
+- **Contrast**: every text color on its background at least 4.5:1 (WCAG AA), borders at least 3:1. The selected skill
+  is in inverse video: `--bg` on `--fg`
+- **Type**: monospace everywhere, from the system (`ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace`).
+  The heading shows `SKILL ATLAS`, the button `[ SCAN ]` (inverse video on hover and focus), a `>` prompt stands before
+  each field, and a block cursor `█` blinks at the end of the status while a scan runs: all from CSS, so the texts stay
+  `Skill Atlas`, `Scan` and the status's own
+- **The CRT**: faint scanlines from a fixed overlay that takes no clicks, a soft glow on the text in its own color; no flicker
+- **Focus**: a 2px `--fg` outline on every field, button and skill
+- **Reduced motion** (`prefers-reduced-motion: reduce`): nothing blinks or moves
+- **Nothing from outside**: no fonts, images or stylesheets from the network (no `<link>`, `@import` or `url(http…)`);
+  everything is in the page, which works offline
