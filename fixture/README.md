@@ -8,6 +8,7 @@ A small repository for the tests.
 | `.github/skills/code-style` | a skill in another agent's folder |
 | `.agents/skills/release-checklist` | malformed front matter |
 | `agent/skills/run-tests` | a skill in the fourth root |
+| `.claude/skills/translations` | an abbreviation, `e.g.`, in the description's first sentence |
 | `.agents/skills/pull-requests`, `.claude/skills/pull-requests`, `agent/skills/pull-requests` | copies: one skill |
 | `SKILL.md` | not a project skill: at the repository root |
 | `.claude/skills/SKILL.md` | not a project skill: in a root, without a `<name>` directory |

@@ -44,7 +44,7 @@ test('./fixture: every project skill once, sorted by name, linked to its file, i
   assert.equal(
     fixture.stdout,
     [
-      'fixture · 5 skills',
+      'fixture · 6 skills',
       "code-style — Follow the project's code style.",
       `  ${root}/.github/skills/code-style/SKILL.md`,
       'commits — Write commit messages the way this repository does.',
@@ -56,6 +56,8 @@ test('./fixture: every project skill once, sorted by name, linked to its file, i
       `  ${root}/.agents/skills/release-checklist/SKILL.md`,
       'run-tests — Run the tests the way CI does.',
       `  ${root}/agent/skills/run-tests/SKILL.md`,
+      'translations — Translate the UI strings, e.g. menus and dialogs, the way this repository does.',
+      `  ${root}/.claude/skills/translations/SKILL.md`,
     ].join('\n'),
   );
   assert.match(fixture.stderr, /^warning: \.agents\/skills\/release-checklist\/SKILL\.md: malformed front matter: /);

@@ -61,7 +61,7 @@ async function page(repo: string) {
 
 test('the page: the skills sorted by name, with first sentence and path; the first one selected; warnings under the field', async () => {
   const shown = await page(FIXTURE);
-  assert.equal(shown.status, 'fixture · 5 skills');
+  assert.equal(shown.status, 'fixture · 6 skills');
   assert.equal(shown.error, false);
   assert.deepEqual(shown.skills, [
     ['code-style', "Follow the project's code style.", '.github/skills/code-style/SKILL.md'],
@@ -69,6 +69,7 @@ test('the page: the skills sorted by name, with first sentence and path; the fir
     ['pull-requests', 'Open pull requests the way this repository does.', '.agents/skills/pull-requests/SKILL.md'],
     ['release-checklist', '', '.agents/skills/release-checklist/SKILL.md'],
     ['run-tests', 'Run the tests the way CI does.', 'agent/skills/run-tests/SKILL.md'],
+    ['translations', 'Translate the UI strings, e.g. menus and dialogs, the way this repository does.', '.claude/skills/translations/SKILL.md'],
   ]);
   assert.equal(shown.warnings.length, 1);
   assert.match(shown.warnings[0]!, /^warning: \.agents\/skills\/release-checklist\/SKILL\.md: malformed front matter: /);
@@ -213,5 +214,5 @@ test('the CLI: serve prints the address and the page answers there until stopped
   const match = /^Skill Atlas web view: (http:\/\/127\.0\.0\.1:\d+\/)\n$/.exec(line);
   assert.ok(match, line);
   const answer = (await (await fetch(`${match[1]}api/scan?repo=${encodeURIComponent(FIXTURE)}`)).json()) as WebScan;
-  assert.equal(answer.skills.length, 5);
+  assert.equal(answer.skills.length, 6);
 });

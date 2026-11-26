@@ -42,5 +42,6 @@ export function sortSkills(skills: Skill[]): Skill[] {
 /** A description's first sentence, on one line: what `scan` prints and the web view lists. */
 export function firstSentence(text: string): string {
   const line = text.replace(/\s+/g, ' ').trim();
-  return /^.*?[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
+  // The period of an abbreviation that never ends a sentence, such as `e.g.`, does not end it.
+  return /^.*?(?<!(?:^|[\s(])(?:e\.g|i\.e|cf|vs))[.!?](?=\s|$)/i.exec(line)?.[0] ?? line;
 }
