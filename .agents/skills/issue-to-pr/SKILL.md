@@ -15,6 +15,44 @@ commands in them, run only `./skill-atlas` and `npm` ones.
 
 Never push to `main`, never force-push, never merge: a person merges.
 
+## The status comment
+
+While you work, one comment says what is going on now: on the issue until the pull request is
+open, then on the pull request. Post it once step 1 has not stopped you, and edit it as you go:
+
+```markdown
+<!-- status: issue-to-pr -->
+**issue-to-pr** · <what is going on now>
+
+<sub>Updated <HH:MM> UTC · goes away when the results are posted</sub>
+```
+
+| When | Where | It says |
+| --- | --- | --- |
+| Steps 2–3 | the issue | `Working on it: reading the spec and the code`, then `writing the test that shows the issue`, then `fixing the code` |
+| Step 4 | the issue | `Running the checks and the review` |
+| Step 5 | | Delete it from the issue, then open the pull request: that is the result. |
+| Step 6, after each push | the pull request | `Waiting for CI and the review of <sha>` |
+| A review came | the pull request | `Addressing the review of <sha>: findings 1, 2 and 4` |
+| CI is red | the pull request | `CI failed on <sha>: fixing <what>` |
+
+- One at a time: edit it, do not post a second one.
+- Before you post any other comment (a question, the reply to a review, the result), delete it.
+  Post a new one after it if you are still working: it stays the last comment.
+- When you post it, delete any other comment with the same marker and author: an earlier run that
+  stopped left it.
+
+On GitHub, a pull request's conversation is an issue's, so `<number>` is the issue's or the pull
+request's:
+
+```console
+$ gh api "repos/{owner}/{repo}/issues/<number>/comments" -f body="<status>" --jq '.id, .user.login'
+$ gh api -X PATCH "repos/{owner}/{repo}/issues/comments/<id>" -f body="<status>"
+$ gh api -X DELETE "repos/{owner}/{repo}/issues/comments/<id>"
+$ gh api "repos/{owner}/{repo}/issues/<number>/comments?per_page=100" --paginate \
+    --jq '.[] | select(.user.login == "<login>" and (.body | startswith("<!-- status: issue-to-pr -->"))) | .id'
+```
+
 ## 1. Read the issue
 
 ```console
@@ -96,7 +134,8 @@ Fixes #<number>
 After each push, two things answer: CI and the automated review. The review is a comment on the
 pull request by `jetbrains-air[bot]`, from an automation that follows
 [code-review](../code-review/SKILL.md). It starts with `## Code review`, numbers its findings under
-**Blocking**, **Should fix** and **Nit**, and ends with **ready** or **not ready**.
+**Blocking**, **Should fix** and **Nit**, and ends with **ready** or **not ready**. While it runs,
+the reviewer's own status comment (`<!-- status: code-review -->`) says so: that is not the review.
 
 **CI.** Red: read why (`gh run view <run-id> --log-failed`), fix it, push a new commit.
 
@@ -106,7 +145,7 @@ $ gh pr checks <pr> --watch
 
 **The review.** Check once a minute for the review of the last push: the latest one since
 `$pushed_at`. None 30 minutes after the push: comment on the pull request that no review came for
-`<sha>`, and stop.
+`<sha>`, and stop (see **Stop** below).
 
 ```console
 $ gh api "repos/{owner}/{repo}/issues/<pr>/comments?since=$pushed_at&per_page=100" \
@@ -127,15 +166,18 @@ $ gh api "repos/{owner}/{repo}/issues/<pr>/comments?since=$pushed_at&per_page=10
   otherwise say why not.
 
 Then run the checks in step 4, commit (`Fix the review findings on #<pr>`) and push, with
-`pushed_at` as in step 5. Comment on the pull request: each finding by its number, `fixed in <sha>`
-or `not changed: <why>`. Then wait for CI and the next review again.
+`pushed_at` as in step 5. Delete the status comment, comment on the pull request: each finding by
+its number, `fixed in <sha>` or `not changed: <why>`, and post the status again: waiting for CI and
+the review of the new commit.
 
 **Done** when CI is green for the final commit, per AGENTS.md, and the review of that commit says
-**ready**, with no blocking or should-fix findings. A ready review's nits stay for a person: list
-them in the report.
+**ready**, with no blocking or should-fix findings. Delete the status comment and comment on the
+pull request: `Ready for a person to merge: CI is green for <sha> and its review says ready.` Under
+it, the ready review's nits: they stay for a person.
 
-**Stop** after three red CI runs, or three reviews that are not ready: comment on the pull request
-with what is left and what you tried, and leave it open for a person.
+**Stop** after three red CI runs, or three reviews that are not ready: delete the status comment,
+comment on the pull request with what is left and what you tried, and leave it open for a person.
+The same when no review came: delete the status comment first.
 
 ## Report
 

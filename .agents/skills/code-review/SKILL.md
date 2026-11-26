@@ -10,6 +10,32 @@ The change: what the user names. Otherwise, the branch and the working tree agai
 
 Review only; change nothing unless the user asks for the fixes.
 
+## On a pull request: the status comment
+
+When you review a pull request on GitHub and post the report there, as the review automation does,
+one comment says what is going on while you work. Post it first, and edit it as you go:
+
+```markdown
+<!-- status: code-review -->
+**Code review** · <what is going on now>
+
+<sub>Updated <HH:MM> UTC · goes away when the review is posted</sub>
+```
+
+It says `Reviewing <sha>: reading the spec and the change`, then `running the checks`, then
+`writing the review`. When the report is ready, delete it, then post the report as one comment that
+starts with `## Code review`: the pull request's author finds the review by that. When you post the
+status comment, delete any other comment with the same marker and author: an earlier review that
+stopped left it.
+
+```console
+$ gh api "repos/{owner}/{repo}/issues/<pr>/comments" -f body="<status>" --jq '.id, .user.login'
+$ gh api -X PATCH "repos/{owner}/{repo}/issues/comments/<id>" -f body="<status>"
+$ gh api -X DELETE "repos/{owner}/{repo}/issues/comments/<id>"
+$ gh api "repos/{owner}/{repo}/issues/<pr>/comments?per_page=100" --paginate \
+    --jq '.[] | select(.user.login == "<login>" and (.body | startswith("<!-- status: code-review -->"))) | .id'
+```
+
 ## 1. Read first
 
 - [AGENTS.md](../../../AGENTS.md), [spec/analysis.md](../../../spec/analysis.md), [spec/cli.md](../../../spec/cli.md).
