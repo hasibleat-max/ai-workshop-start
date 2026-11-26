@@ -25,6 +25,31 @@ export const EXAMPLE: Recording = {
   },
 };
 
+/** JetBrains/abbreviations: descriptions whose first sentence has an abbreviation in it (issue #7). */
+export const ABBREVIATIONS: Recording = {
+  'https://api.github.com/repos/JetBrains/abbreviations': { status: 200, body: { full_name: 'JetBrains/abbreviations', default_branch: 'main' } },
+  'https://api.github.com/repos/JetBrains/abbreviations/commits/main': { status: 200, body: { sha: EXAMPLE_COMMIT } },
+  'https://api.github.com/search/code?q=filename:SKILL.md+repo:JetBrains/abbreviations&per_page=100&page=1': {
+    status: 200,
+    body: {
+      total_count: 3,
+      items: [{ path: '.claude/skills/a/SKILL.md' }, { path: '.claude/skills/b/SKILL.md' }, { path: '.claude/skills/c/SKILL.md' }],
+    },
+  },
+  [`https://raw.githubusercontent.com/JetBrains/abbreviations/${EXAMPLE_COMMIT}/.claude/skills/a/SKILL.md`]: {
+    status: 200,
+    body: '---\nname: a\ndescription: Use e.g. for this. Second.\n---\n',
+  },
+  [`https://raw.githubusercontent.com/JetBrains/abbreviations/${EXAMPLE_COMMIT}/.claude/skills/b/SKILL.md`]: {
+    status: 200,
+    body: '---\nname: b\ndescription: Build tools, i.e. Gradle or Maven. Second.\n---\n',
+  },
+  [`https://raw.githubusercontent.com/JetBrains/abbreviations/${EXAMPLE_COMMIT}/.claude/skills/c/SKILL.md`]: {
+    status: 200,
+    body: '---\nname: c\ndescription: Run the build tool (e.g. Gradle). Second.\n---\n',
+  },
+};
+
 /** `skill-atlas <args>`, as the CLI runs it, with GitHub answering from the recording, EXAMPLE by default. */
 export async function atlas(args: string[], recording: Recording = EXAMPLE) {
   const github = replay(recording);
