@@ -94,66 +94,96 @@ const PAGE = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Skill Atlas</title>
 <style>
-  /* A retro CRT terminal, green phosphor on black. Every text is at least 4.5:1 on its background, borders 3:1. */
+  /* A calm developer tool: neutral surfaces, one accent, light and dark from the system. Every text
+     is at least 4.5:1 on its background, borders and focus rings 3:1 (spec/web.md, "The look"). */
   :root {
-    color-scheme: dark;
-    --bg: #0a0f0a; --fg: #33ff66; --dim: #1fa84a; --line: #1f7a3a; --hover: #0f2a17;
-    --amber: #ffb000; --red: #ff5555; --inverse-dim: #0a3d1a;
-    /* The glow, in each text's own color. */
-    --glow: 0 0 3px color-mix(in srgb, currentColor 35%, transparent);
+    color-scheme: light dark;
+    --bg: #ffffff; --surface: #f6f8fa; --hover: #eaeef2; --selected: #ddf4ff;
+    --text: #1f2328; --muted: #59636e; --border: #818b98;
+    --accent: #0969da; --accent-hover: #0858b9; --on-accent: #ffffff;
+    --mark: #fff1a8; --on-mark: #1f2328;
+    --warning: #7d4e00; --warning-bg: #fff8c5; --danger: #c11d29; --danger-bg: #ffebe9;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    --radius: 6px;
+    --speed: 150ms;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --surface: #151b23; --hover: #212830; --selected: #14263d;
+      --text: #e6edf3; --muted: #9198a1; --border: #656c76;
+      --accent: #4493f8; --accent-hover: #6cb6ff; --on-accent: #0d1117;
+      --mark: #e3b341; --on-mark: #0d1117;
+      --warning: #e3b341; --warning-bg: #272115; --danger: #ff7b72; --danger-bg: #2d1416;
+    }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html { background: var(--bg); }
-  body { margin: 0; font-size: 14px; line-height: 1.5; font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; background: var(--bg); color: var(--fg); text-shadow: var(--glow); display: flex; flex-direction: column; height: 100vh; }
-  /* The scanlines: a fixed overlay over the whole page that takes no clicks. */
-  body::after { content: ""; position: fixed; inset: 0; z-index: 1; pointer-events: none; background: repeating-linear-gradient(to bottom, transparent 0 2px, #00000014 2px 3px); }
-  input, button, pre { font: inherit; }
-  header { padding: 12px 16px; border-bottom: 1px solid var(--line); }
-  h1 { font-size: 16px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .2em; }
-  /* The prompts: generated content with no alternative text, so screen readers do not read it. */
-  form::before, .field::before { content: ">"; content: ">" / ""; flex: none; align-self: center; font-weight: 700; }
-  form { display: flex; gap: 8px; }
-  input { flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 0; background: var(--bg); color: var(--fg); text-shadow: inherit; caret-color: var(--fg); }
-  input::placeholder { color: var(--dim); opacity: 1; }
-  input:disabled { color: var(--dim); }
-  #repo:focus-visible { outline: 2px solid var(--fg); outline-offset: 0; }
-  button { padding: 8px 12px; border: 1px solid var(--fg); border-radius: 0; background: var(--bg); color: var(--fg); text-shadow: inherit; text-transform: uppercase; cursor: pointer; }
-  button::before { content: "[ "; content: "[ " / ""; white-space: pre; }
-  button::after { content: " ]"; content: " ]" / ""; white-space: pre; }
-  button:hover, button:focus-visible { background: var(--fg); color: var(--bg); text-shadow: none; }
-  button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
-  button:disabled { border-color: var(--dim); background: var(--bg); color: var(--dim); text-shadow: none; cursor: default; }
-  #status { margin-top: 8px; color: var(--dim); min-height: 1.5em; }
-  #status.error { color: var(--red); }
-  /* While a scan runs: a blinking block cursor, by CSS, so the status's text stays. */
-  #status.busy::after { content: "█"; content: "█" / ""; margin-left: .25em; animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-  #warnings { margin: 4px 0 0; padding-left: 20px; color: var(--amber); }
-  main { flex: 1; display: grid; grid-template-columns: minmax(240px, 1fr) 2fr; min-height: 0; }
-  #list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
-  /* The field's frame holds the prompt, the filter and its counter side by side: the text and the clear button end before the counter. */
-  .field { flex: none; display: flex; align-items: center; gap: 8px; margin: 8px 16px; padding-left: 10px; border: 1px solid var(--line); }
-  .field:focus-within { outline: 2px solid var(--fg); }
-  #filter { min-width: 0; padding-left: 0; border: 0; outline: none; }
-  #counter { flex: none; padding-right: 10px; color: var(--dim); font-size: 12px; white-space: nowrap; }
-  #skills { flex: 1; list-style: none; margin: 0; padding: 0; overflow: auto; border-top: 1px solid var(--line); }
-  #skills li { padding: 10px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  body { margin: 0; font-family: var(--font); font-size: 14px; line-height: 1.5; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100vh; -webkit-font-smoothing: antialiased; }
+  input, button { font: inherit; }
+  /* The header: the name, the field and its button in a row; the status and the warnings under them. */
+  header { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 24px; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  h1 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; font-weight: 600; white-space: nowrap; }
+  h1::before { content: ""; width: 12px; height: 12px; border-radius: 4px; background: var(--accent); }
+  form { display: flex; gap: 8px; max-width: 720px; }
+  #status, #warnings { grid-column: 1 / -1; }
+  input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); transition: border-color var(--speed), background-color var(--speed); }
+  input::placeholder { color: var(--muted); opacity: 1; }
+  #repo:hover { border-color: var(--muted); }
+  #repo:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input:disabled { background: var(--surface); color: var(--muted); cursor: not-allowed; }
+  button { flex: none; height: 36px; padding: 0 16px; border: 1px solid transparent; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); font-weight: 600; cursor: pointer; transition: background-color var(--speed), color var(--speed); }
+  button:hover { background: var(--accent-hover); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { background: var(--surface); color: var(--muted); border-color: var(--border); cursor: not-allowed; }
+  #status { display: flex; align-items: center; gap: 8px; justify-self: start; min-height: 20px; font-size: 13px; color: var(--muted); }
+  #status.error { background: var(--danger-bg); color: var(--danger); padding: 4px 12px; border-radius: var(--radius); }
+  /* While a scan runs: a small spinner before the status, by CSS, so the status's text stays. */
+  #status.busy::before { content: ""; flex: none; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 800ms linear infinite; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  #warnings { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  #warnings:empty { display: none; }
+  #warnings li { background: var(--warning-bg); color: var(--warning); padding: 4px 12px; border-radius: var(--radius); font-size: 13px; overflow-wrap: anywhere; }
+  main { flex: 1; display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); min-height: 0; }
+  #list { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-right: 1px solid var(--border); }
+  /* The field's frame holds the filter and its counter side by side: the text and the clear button end before the counter. */
+  .field { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; margin: 12px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); transition: border-color var(--speed), background-color var(--speed); }
+  .field:has(#filter:enabled):hover { border-color: var(--muted); }
+  .field:has(#filter:disabled) { background: var(--surface); }
+  .field:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #filter { height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; outline: none; }
+  #counter { flex: none; color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #skills { flex: 1; list-style: none; margin: 0; padding: 0 8px 12px; overflow: auto; }
+  #skills li { display: grid; gap: 4px; margin-bottom: 4px; padding: 8px 12px; border-radius: var(--radius); cursor: pointer; transition: background-color var(--speed), box-shadow var(--speed); }
   #skills li:hover { background: var(--hover); }
-  /* Inverse video. Focused, a ring of --bg inside the outline keeps the outline visible on --fg. */
-  #skills li[aria-selected="true"] { background: var(--fg); color: var(--bg); text-shadow: none; }
-  #skills li[aria-selected="true"] .description, #skills li[aria-selected="true"] .path { color: var(--inverse-dim); }
-  #skills li:focus-visible { outline: 2px solid var(--fg); outline-offset: -2px; }
-  #skills li[aria-selected="true"]:focus-visible { box-shadow: inset 0 0 0 4px var(--bg); }
-  .name { font-weight: 700; }
-  .description, .path { color: var(--dim); font-size: 12px; }
-  .found { font-size: 12px; white-space: pre-wrap; word-break: break-word; }
-  mark { background: var(--amber); color: var(--bg); text-shadow: none; }
-  #skill { overflow: auto; padding: 16px; }
-  #skill h2 { margin: 0 0 4px; font-size: 18px; }
-  #skill a { color: var(--fg); word-break: break-all; }
-  #skill a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
-  #skill pre { white-space: pre-wrap; word-break: break-word; padding: 12px; border: 1px solid var(--line); font-size: 13px; line-height: 1.5; }
-  .empty { color: var(--dim); padding: 16px; }
+  /* Selected: a tint of the accent and a bar of it at the left. */
+  #skills li[aria-selected="true"] { background: var(--selected); box-shadow: inset 3px 0 0 var(--accent); }
+  #skills li:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .name { font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+  .description { font-size: 13px; color: var(--muted); }
+  .path { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .found { margin-top: 4px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  #skill pre, .found { font-family: var(--mono); }
+  /* The highlight reaches a pixel past the text without moving it. */
+  mark { background: var(--mark); color: var(--on-mark); border-radius: 2px; box-shadow: 0 0 0 1px var(--mark); }
+  #skill { overflow: auto; padding: 24px 32px; }
+  #skill h2 { margin: 0 0 4px; font-size: 20px; font-weight: 600; line-height: 1.3; }
+  #skill a { color: var(--accent); font-size: 13px; text-decoration: none; overflow-wrap: anywhere; }
+  #skill a:hover { text-decoration: underline; }
+  #skill a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  #skill .path { margin: 4px 0 0; }
+  #skill pre { margin: 16px 0 0; padding: 16px; border-radius: 8px; background: var(--surface); font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .empty { margin: 64px auto 0; max-width: 360px; padding: 0 24px; color: var(--muted); text-align: center; }
+  .empty::before { content: ""; display: block; width: 40px; height: 48px; margin: 0 auto 16px; border: 2px dashed var(--border); border-radius: 8px; }
+  /* Narrow windows: one column, the list above the SKILL.md pane, and the page scrolls. */
+  @media (width < 720px) {
+    body { height: auto; min-height: 100vh; }
+    header { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+    main { grid-template-columns: 1fr; }
+    #list { max-height: 50vh; border-right: 0; border-bottom: 1px solid var(--border); }
+    #skill { overflow: visible; padding: 16px; }
+  }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
@@ -187,7 +217,7 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
-// busy: a scan runs, and the CSS ends the status with a cursor.
+// busy: a scan runs, and the CSS puts a spinner before the status.
 function status(text, state = '') {
   $('status').textContent = text;
   $('status').className = state;
