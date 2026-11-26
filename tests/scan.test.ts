@@ -1,6 +1,6 @@
 // The decisions in spec/analysis.md and spec/cli.md, checked on what the real command prints for
-// ./fixture and for a small GitHub repository answered in tests/helpers.ts. The edge cases of
-// where skills live are yours to add.
+// ./fixture and for a small GitHub repository answered in tests/helpers.ts. Where project skills
+// live, case by case: tests/project-skills.test.ts.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -38,19 +38,24 @@ test('scan prints the repository, then each skill with its first sentence and pi
   );
 });
 
-test('./fixture: every skill, sorted by name, linked to its file, with a warning for the malformed one', () => {
+test('./fixture: every project skill once, sorted by name, linked to its file, its copies, a warning for the malformed one', () => {
   const root = pathToFileURL(FIXTURE).href;
   assert.equal(fixture.code, 0);
   assert.equal(
     fixture.stdout,
     [
-      'fixture · 3 skills',
+      'fixture · 5 skills',
       "code-style — Follow the project's code style.",
       `  ${root}/.github/skills/code-style/SKILL.md`,
       'commits — Write commit messages the way this repository does.',
       `  ${root}/.claude/skills/commits/SKILL.md`,
+      'pull-requests — Open pull requests the way this repository does.',
+      `  ${root}/.agents/skills/pull-requests/SKILL.md`,
+      '  also in .claude/skills/pull-requests/SKILL.md, agent/skills/pull-requests/SKILL.md',
       'release-checklist',
       `  ${root}/.agents/skills/release-checklist/SKILL.md`,
+      'run-tests — Run the tests the way CI does.',
+      `  ${root}/agent/skills/run-tests/SKILL.md`,
     ].join('\n'),
   );
   assert.match(fixture.stderr, /^warning: \.agents\/skills\/release-checklist\/SKILL\.md: malformed front matter: /);

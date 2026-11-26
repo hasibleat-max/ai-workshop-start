@@ -1,4 +1,4 @@
-// Runs the commands the way the CLI does, with GitHub answering from EXAMPLE below.
+// Runs the commands the way the CLI does, with GitHub answering from a recording: EXAMPLE below by default.
 import { fileURLToPath } from 'node:url';
 import { run } from '../src/commands.ts';
 import { openGitHub, parseGitHubUrl } from '../src/core/github.ts';
@@ -25,10 +25,9 @@ const EXAMPLE: Recording = {
   },
 };
 
-const github = replay(EXAMPLE);
-
-/** `skill-atlas <args>`, as the CLI runs it, with GitHub answering from EXAMPLE. */
-export async function atlas(args: string[]) {
+/** `skill-atlas <args>`, as the CLI runs it, with GitHub answering from the recording, EXAMPLE by default. */
+export async function atlas(args: string[], recording: Recording = EXAMPLE) {
+  const github = replay(recording);
   const stdout: string[] = [];
   const stderr: string[] = [];
   const code = await run(args, {
