@@ -440,10 +440,10 @@ test('the filter: a counter in the field, n of total, as you type; none when emp
   assert.equal(one.filter('linter').counter, '1 of 1');
 });
 
-/** The page's stylesheet, as the server sends it. */
+/** The page's stylesheet, as the server sends it, without its comments. */
 const stylesheet = async () => {
   const html = await (await fetch(`${base}/`)).text();
-  return [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((match) => match[1]).join('\n');
+  return [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((match) => match[1]).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
 };
 
 /** WCAG's contrast ratio of two #rrggbb colors. */
@@ -456,59 +456,117 @@ function contrast(a: string, b: string) {
   return (light + 0.05) / (dark + 0.05);
 }
 
-test('the look: the palette on :root, dark only; every text at least 4.5:1 on its background, borders at least 3:1', async () => {
-  const root = /:root\s*\{([^}]*)\}/.exec(await stylesheet())![1];
-  const colors = Object.fromEntries([...root.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)].map(([, name, value]) => [name, value.toLowerCase()]));
-  assert.match(root, /color-scheme:\s*dark;/);
-  assert.deepEqual(colors, {
-    bg: '#0a0f0a', fg: '#33ff66', dim: '#1fa84a', line: '#1f7a3a', hover: '#0f2a17', amber: '#ffb000', red: '#ff5555', 'inverse-dim': '#0a3d1a',
+/** The custom properties of a block of declarations: name → #rrggbb. */
+const palette = (block: string) => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)].map(([, name, value]) => [name, value.toLowerCase()]));
+
+/** The light palette on :root, and the dark one on :root under prefers-color-scheme: dark. */
+async function palettes() {
+  const css = await stylesheet();
+  const light = /^\s*:root\s*\{([^}]*)\}/m.exec(css);
+  const dark = /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css);
+  assert.ok(light, 'a light palette on :root');
+  assert.ok(dark, 'a dark palette on :root under prefers-color-scheme: dark');
+  return { css, root: light[1], light: palette(light[1]), dark: palette(dark[1]) };
+}
+
+test('the look: a light and a dark palette on :root, following the system, as the spec gives them', async () => {
+  const { css, root, light, dark } = await palettes();
+  assert.match(root, /color-scheme:\s*light dark;/);
+  assert.deepEqual(light, {
+    bg: '#ffffff', surface: '#f6f8fa', hover: '#eaeef2', selected: '#ddf4ff', text: '#1f2328', muted: '#59636e', border: '#818b98',
+    accent: '#0969da', 'accent-hover': '#0858b9', 'on-accent': '#ffffff', mark: '#fff1a8', 'on-mark': '#1f2328',
+    warning: '#7d4e00', 'warning-bg': '#fff8c5', danger: '#c11d29', 'danger-bg': '#ffebe9',
   });
-  for (const [text, background, least] of [
-    ['fg', 'bg', 4.5], // text
-    ['dim', 'bg', 4.5], // paths, descriptions, the status, the counter, placeholders
-    ['amber', 'bg', 4.5], // warnings
-    ['red', 'bg', 4.5], // errors
-    ['fg', 'hover', 4.5], // the skill under the pointer
-    ['dim', 'hover', 4.5],
-    ['bg', 'fg', 4.5], // the selected skill, the Scan button on hover and focus
-    ['inverse-dim', 'fg', 4.5], // the selected skill's description and path
-    ['bg', 'amber', 4.5], // <mark>
-    ['line', 'bg', 3], // borders and rules
-  ] as const) {
-    assert.ok(contrast(colors[text], colors[background]) >= least, `--${text} on --${background}: ${contrast(colors[text], colors[background]).toFixed(1)}`);
+  assert.deepEqual(dark, {
+    bg: '#0d1117', surface: '#151b23', hover: '#212830', selected: '#14263d', text: '#e6edf3', muted: '#9198a1', border: '#656c76',
+    accent: '#4493f8', 'accent-hover': '#6cb6ff', 'on-accent': '#0d1117', mark: '#e3b341', 'on-mark': '#0d1117',
+    warning: '#e3b341', 'warning-bg': '#272115', danger: '#ff7b72', 'danger-bg': '#2d1416',
+  });
+  // Every color the page uses is in both palettes; no color outside them.
+  for (const [, name] of css.matchAll(/var\(--([\w-]+)\)/g)) {
+    if (['font', 'mono', 'radius', 'speed'].includes(name)) continue;
+    assert.ok(name in light && name in dark, `--${name} in both palettes`);
+  }
+  const rules = css.replace(/:root\s*\{[^}]*\}/g, '');
+  assert.doesNotMatch(rules, /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i, 'colors only from the palettes');
+});
+
+test('the look: in light and in dark, every text at least 4.5:1 on its background; borders and focus rings at least 3:1', async () => {
+  const { light, dark } = await palettes();
+  for (const [scheme, colors] of [['light', light], ['dark', dark]] as const) {
+    for (const [text, background, least] of [
+      ['text', 'bg', 4.5], // text, skill names, the SKILL.md pane
+      ['muted', 'bg', 4.5], // descriptions, paths, the status, the counter, placeholders
+      ['text', 'surface', 4.5], // the list's column, the SKILL.md text
+      ['muted', 'surface', 4.5], // a disabled field or button
+      ['text', 'hover', 4.5], // the skill under the pointer
+      ['muted', 'hover', 4.5],
+      ['text', 'selected', 4.5], // the selected skill
+      ['muted', 'selected', 4.5],
+      ['accent', 'bg', 4.5], // links
+      ['on-accent', 'accent', 4.5], // the Scan button
+      ['on-accent', 'accent-hover', 4.5], // the Scan button under the pointer
+      ['on-mark', 'mark', 4.5], // what the filter found
+      ['warning', 'warning-bg', 4.5], // warnings
+      ['danger', 'danger-bg', 4.5], // an error
+      ['border', 'bg', 3], // the fields' borders, the rules
+      ['border', 'surface', 3],
+      ['accent', 'bg', 3], // focus rings, wherever they are
+      ['accent', 'surface', 3],
+      ['accent', 'hover', 3],
+      ['accent', 'selected', 3], // and the selected skill's bar
+    ] as const) {
+      const ratio = contrast(colors[text], colors[background]);
+      assert.ok(ratio >= least, `${scheme}: --${text} on --${background}: ${ratio.toFixed(2)}`);
+    }
   }
 });
 
-test('the look: nothing from outside, no <link>, no @import, no url( to http; the texts stay, the rest is CSS', async () => {
+test('the look: hierarchy and states; focus visible on every field, button, skill and link', async () => {
+  const css = await stylesheet();
+  const rule = (selector: string) => new RegExp(selector.replace(/[.#[\]()]/g, '\\$&') + '\\s*\\{([^}]*)\\}').exec(css)?.[1] ?? '';
+  assert.match(rule('.name'), /font-weight:\s*600;/);
+  assert.match(rule('.name'), /color:\s*var\(--text\);/);
+  assert.match(rule('.description'), /color:\s*var\(--muted\);/);
+  assert.match(rule('.path'), /color:\s*var\(--muted\);/);
+  assert.match(rule('#skills li:hover'), /background:\s*var\(--hover\);/);
+  assert.match(rule('#skills li[aria-selected="true"]'), /background:\s*var\(--selected\);[^}]*box-shadow:\s*inset 3px 0 0 var\(--accent\);/);
+  assert.match(rule('mark'), /background:\s*var\(--mark\);\s*color:\s*var\(--on-mark\);/);
+  assert.match(rule('input:disabled'), /background:\s*var\(--surface\);\s*color:\s*var\(--muted\);/);
+  assert.match(rule('button:disabled'), /background:\s*var\(--surface\);\s*color:\s*var\(--muted\);/);
+  assert.match(rule('button:hover'), /background:\s*var\(--accent-hover\);/);
+  assert.match(rule('#warnings li'), /background:\s*var\(--warning-bg\);\s*color:\s*var\(--warning\);/);
+  assert.match(rule('#status.error'), /background:\s*var\(--danger-bg\);\s*color:\s*var\(--danger\);/);
+  assert.match(rule('.empty'), /color:\s*var\(--muted\);[^}]*text-align:\s*center;/);
+  for (const selector of ['#repo:focus-visible', '.field:focus-within', 'button:focus-visible', '#skills li:focus-visible', '#skill a:focus-visible']) {
+    assert.match(rule(selector), /outline:\s*2px solid var\(--accent\)/, selector);
+  }
+  // The counter's hidden attribute still hides it.
+  assert.doesNotMatch(rule('#counter'), /display:/);
+});
+
+test('the look: nothing from outside; system fonts, monospace only for the SKILL.md text and what the filter found; no CRT', async () => {
   const html = await (await fetch(`${base}/`)).text();
   const css = await stylesheet();
   assert.doesNotMatch(html, /<link\b/i);
   assert.doesNotMatch(html, /\bsrc\s*=/i);
   assert.doesNotMatch(css, /@import/i);
-  assert.doesNotMatch(css, /url\(\s*['"]?\s*(https?:)?\/\//i);
-  assert.match(css, /font-family:\s*ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;/);
-  // The heading, the button and the prompts: by CSS, generated content with no alternative text.
-  assert.match(css, /h1\s*\{[^}]*text-transform:\s*uppercase;[^}]*letter-spacing/);
-  assert.match(css, /button::before\s*\{[^}]*content:\s*"\[ " \/ "";/);
-  assert.match(css, /button::after\s*\{[^}]*content:\s*" \]" \/ "";/);
-  assert.match(css, /button\s*\{[^}]*text-transform:\s*uppercase;/);
-  assert.match(css, /button:hover, button:focus-visible\s*\{[^}]*background:\s*var\(--fg\);\s*color:\s*var\(--bg\);/);
-  assert.match(css, /form::before, \.field::before\s*\{[^}]*content:\s*">" \/ "";/);
-  // The scanlines: a fixed overlay that takes no clicks.
-  assert.match(css, /body::after\s*\{[^}]*position:\s*fixed;\s*inset:\s*0;[^}]*pointer-events:\s*none;/);
-  // The selected skill in inverse video.
-  assert.match(css, /#skills li\[aria-selected="true"\]\s*\{[^}]*background:\s*var\(--fg\);\s*color:\s*var\(--bg\);/);
-  assert.match(css, /#skills li\[aria-selected="true"\] \.description, #skills li\[aria-selected="true"\] \.path\s*\{\s*color:\s*var\(--inverse-dim\);/);
-  // Focus: a 2px --fg outline on every field, button and skill.
-  for (const selector of ['#repo:focus-visible', '.field:focus-within', 'button:focus-visible', '#skills li:focus-visible', '#skill a:focus-visible']) {
-    assert.match(css, new RegExp(selector.replace(/[.#[\]]/g, '\\$&') + '\\s*\\{[^}]*outline:\\s*2px solid var\\(--fg\\)'), selector);
-  }
+  assert.doesNotMatch(css, /@font-face/i);
+  assert.doesNotMatch(css, /url\(/i);
+  assert.match(css, /--font:\s*system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;/);
+  assert.match(css, /--mono:\s*ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;/);
+  assert.match(css, /body\s*\{[^}]*font-family:\s*var\(--font\);/);
+  const mono = [...css.matchAll(/([^{}]+)\{[^}]*font-family:\s*var\(--mono\)/g)].map((match) => match[1].trim());
+  assert.deepEqual(mono, ['#skill pre, .found']);
+  assert.doesNotMatch(css.replace(/--mono:[^;]*;/, ''), /monospace/, 'monospace only in --mono');
+  // The CRT is gone: no glow, no scanlines, no prompts or brackets, no block cursor, no uppercase heading.
+  assert.doesNotMatch(css, /text-shadow|repeating-linear-gradient|text-transform|█|content:\s*"[^"]/);
   const shown = await load();
   assert.equal(shown.window.document.querySelector('h1')!.textContent, 'Skill Atlas');
   assert.equal(shown.$('go').textContent, 'Scan');
 });
 
-test('the look: a block cursor ends the status while a scan runs, by CSS; the status text stays', async () => {
+test('the look: a scan in progress shows a spinner before the status, by CSS; the status text stays', async () => {
   const shown = await load();
   const fetch = shown.window.fetch;
   let answer!: () => void;
@@ -526,14 +584,36 @@ test('the look: a block cursor ends the status while a scan runs, by CSS; the st
   assert.equal($('status').className, '');
   await shown.scan(join(FIXTURE, 'no-such-directory'));
   assert.equal($('status').className, 'error');
-  assert.match(await stylesheet(), /#status\.busy::after\s*\{[^}]*content:\s*"█"/);
+  const spinner = /#status\.busy::before\s*\{([^}]*)\}/.exec(await stylesheet());
+  assert.ok(spinner, 'a spinner before the busy status');
+  assert.match(spinner[1], /content:\s*"";/);
+  assert.match(spinner[1], /border-radius:\s*50%;/);
+  assert.match(spinner[1], /border-top-color:\s*var\(--accent\);/);
+  assert.match(spinner[1], /animation:\s*spin\b[^;]*infinite;/);
+  assert.match(await stylesheet(), /@keyframes spin\s*\{\s*to\s*\{\s*transform:\s*rotate\(1turn\);\s*\}\s*\}/);
 });
 
-test('the look: with prefers-reduced-motion: reduce, nothing blinks or moves', async () => {
+test('the look: under 720 px wide, the list above the SKILL.md pane, and the page scrolls', async () => {
   const css = await stylesheet();
-  assert.match(css, /@keyframes blink/);
+  const narrow = /@media \(max-width: 719px\)\s*\{([\s\S]*?)\}\s*\}/.exec(css);
+  assert.ok(narrow, 'a rule for narrow windows');
+  assert.match(narrow[1], /body\s*\{[^}]*height:\s*auto;/);
+  assert.match(narrow[1], /main\s*\{[^}]*grid-template-columns:\s*1fr;/);
+  assert.match(narrow[1], /#skills\s*\{[^}]*max-height:\s*50vh;/);
+  // The list comes first in the page, so in one column it is above the pane.
+  const shown = await load();
+  assert.equal(shown.$('list').nextElementSibling, shown.$('skill'));
+});
+
+test('the look: transitions of 150 ms; with prefers-reduced-motion: reduce, nothing moves', async () => {
+  const css = await stylesheet();
+  assert.match(css, /--speed:\s*150ms;/);
+  const transitions = [...css.matchAll(/transition:\s*([^;]+);/g)].map((match) => match[1]).filter((value) => value !== 'none !important');
+  assert.ok(transitions.length > 0, 'some transitions');
+  for (const value of transitions) assert.match(value, /var\(--speed\)/, value);
   const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\}\s*\}/.exec(css);
   assert.ok(reduced, 'a prefers-reduced-motion: reduce rule');
-  assert.match(reduced[1], /animation:\s*none/);
-  assert.match(reduced[1], /transition:\s*none/);
+  assert.match(reduced[1], /\*, \*::before, \*::after\s*\{/);
+  assert.match(reduced[1], /animation:\s*none !important;/);
+  assert.match(reduced[1], /transition:\s*none !important;/);
 });
