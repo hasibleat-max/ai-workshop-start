@@ -99,11 +99,12 @@ test('the page: a GitHub skill links to its SKILL.md at the scanned commit', asy
   ]);
 });
 
-test('the page: the first sentence does not end at an abbreviation such as e.g. or i.e.', async () => {
+test('the page: the first sentence does not end at an abbreviation such as e.g. or i.e., also after a bracket', async () => {
   const shown = await page('https://github.com/JetBrains/abbreviations');
   assert.deepEqual(shown.skills, [
     ['a', 'Use e.g. for this.', '.claude/skills/a/SKILL.md'],
     ['b', 'Build tools, i.e. Gradle or Maven.', '.claude/skills/b/SKILL.md'],
+    ['c', 'Run the build tool (e.g. Gradle).', '.claude/skills/c/SKILL.md'],
   ]);
 });
 

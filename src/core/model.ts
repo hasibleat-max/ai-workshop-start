@@ -45,5 +45,5 @@ export function sortSkills(skills: Skill[]): Skill[] {
  */
 export function firstSentence(text: string): string {
   const line = text.replace(/\s+/g, ' ').trim();
-  return /^.*?(?<!(?:^|\s)(?:[a-z]\.)+[a-z])[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
+  return /^.*?(?<!\b(?:[a-z]\.)+[a-z])[.!?](?=\s|$)/.exec(line)?.[0] ?? line;
 }

@@ -38,17 +38,19 @@ test('scan prints the repository, then each skill with its first sentence and pi
   );
 });
 
-test('the first sentence does not end at an abbreviation such as e.g. or i.e.', async () => {
+test('the first sentence does not end at an abbreviation such as e.g. or i.e., also after a bracket', async () => {
   const scanned = await atlas(['scan', 'github.com/JetBrains/abbreviations'], ABBREVIATIONS);
   assert.equal(scanned.code, 0, scanned.stderr);
   assert.equal(
     scanned.stdout,
     [
-      'JetBrains/abbreviations · 2 skills',
+      'JetBrains/abbreviations · 3 skills',
       'a — Use e.g. for this.',
       `  https://github.com/JetBrains/abbreviations/blob/${EXAMPLE_COMMIT}/.claude/skills/a/SKILL.md`,
       'b — Build tools, i.e. Gradle or Maven.',
       `  https://github.com/JetBrains/abbreviations/blob/${EXAMPLE_COMMIT}/.claude/skills/b/SKILL.md`,
+      'c — Run the build tool (e.g. Gradle).',
+      `  https://github.com/JetBrains/abbreviations/blob/${EXAMPLE_COMMIT}/.claude/skills/c/SKILL.md`,
     ].join('\n'),
   );
 });
