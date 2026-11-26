@@ -50,6 +50,20 @@ export const ABBREVIATIONS: Recording = {
   },
 };
 
+/** JetBrains/indented: one skill whose SKILL.md has Windows line endings and an indented line (issue #9). */
+export const INDENTED: Recording = {
+  'https://api.github.com/repos/JetBrains/indented': { status: 200, body: { full_name: 'JetBrains/indented', default_branch: 'main' } },
+  'https://api.github.com/repos/JetBrains/indented/commits/main': { status: 200, body: { sha: EXAMPLE_COMMIT } },
+  'https://api.github.com/search/code?q=filename:SKILL.md+repo:JetBrains/indented&per_page=100&page=1': {
+    status: 200,
+    body: { total_count: 1, items: [{ path: '.claude/skills/lint/SKILL.md' }] },
+  },
+  [`https://raw.githubusercontent.com/JetBrains/indented/${EXAMPLE_COMMIT}/.claude/skills/lint/SKILL.md`]: {
+    status: 200,
+    body: '---\r\nname: lint\r\ndescription: Lint the code.\r\n---\r\n# Lint\r\n\r\n    Run the Linter, then fix what the linter says.  \r\n',
+  },
+};
+
 /** `skill-atlas <args>`, as the CLI runs it, with GitHub answering from the recording, EXAMPLE by default. */
 export async function atlas(args: string[], recording: Recording = EXAMPLE) {
   const github = replay(recording);
