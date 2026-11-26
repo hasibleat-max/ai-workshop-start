@@ -439,3 +439,101 @@ test('the filter: a counter in the field, n of total, as you type; none when emp
   const one = await page('https://github.com/JetBrains/indented');
   assert.equal(one.filter('linter').counter, '1 of 1');
 });
+
+/** The page's stylesheet, as the server sends it. */
+const stylesheet = async () => {
+  const html = await (await fetch(`${base}/`)).text();
+  return [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((match) => match[1]).join('\n');
+};
+
+/** WCAG's contrast ratio of two #rrggbb colors. */
+function contrast(a: string, b: string) {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+test('the look: the palette on :root, dark only; every text at least 4.5:1 on its background, borders at least 3:1', async () => {
+  const root = /:root\s*\{([^}]*)\}/.exec(await stylesheet())![1];
+  const colors = Object.fromEntries([...root.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)].map(([, name, value]) => [name, value.toLowerCase()]));
+  assert.match(root, /color-scheme:\s*dark;/);
+  assert.deepEqual(colors, {
+    bg: '#0a0f0a', fg: '#33ff66', dim: '#1fa84a', line: '#1f7a3a', hover: '#0f2a17', amber: '#ffb000', red: '#ff5555', 'inverse-dim': '#0a3d1a',
+  });
+  for (const [text, background, least] of [
+    ['fg', 'bg', 4.5], // text
+    ['dim', 'bg', 4.5], // paths, descriptions, the status, the counter, placeholders
+    ['amber', 'bg', 4.5], // warnings
+    ['red', 'bg', 4.5], // errors
+    ['fg', 'hover', 4.5], // the skill under the pointer
+    ['dim', 'hover', 4.5],
+    ['bg', 'fg', 4.5], // the selected skill, the Scan button on hover and focus
+    ['inverse-dim', 'fg', 4.5], // the selected skill's description and path
+    ['bg', 'amber', 4.5], // <mark>
+    ['line', 'bg', 3], // borders and rules
+  ] as const) {
+    assert.ok(contrast(colors[text], colors[background]) >= least, `--${text} on --${background}: ${contrast(colors[text], colors[background]).toFixed(1)}`);
+  }
+});
+
+test('the look: nothing from outside, no <link>, no @import, no url( to http; the texts stay, the rest is CSS', async () => {
+  const html = await (await fetch(`${base}/`)).text();
+  const css = await stylesheet();
+  assert.doesNotMatch(html, /<link\b/i);
+  assert.doesNotMatch(html, /\bsrc\s*=/i);
+  assert.doesNotMatch(css, /@import/i);
+  assert.doesNotMatch(css, /url\(\s*['"]?\s*(https?:)?\/\//i);
+  assert.match(css, /font-family:\s*ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;/);
+  // The heading, the button and the prompts: by CSS, generated content with no alternative text.
+  assert.match(css, /h1\s*\{[^}]*text-transform:\s*uppercase;[^}]*letter-spacing/);
+  assert.match(css, /button::before\s*\{[^}]*content:\s*"\[ " \/ "";/);
+  assert.match(css, /button::after\s*\{[^}]*content:\s*" \]" \/ "";/);
+  assert.match(css, /button\s*\{[^}]*text-transform:\s*uppercase;/);
+  assert.match(css, /button:hover, button:focus-visible\s*\{[^}]*background:\s*var\(--fg\);\s*color:\s*var\(--bg\);/);
+  assert.match(css, /form::before, \.field::before\s*\{[^}]*content:\s*">" \/ "";/);
+  // The scanlines: a fixed overlay that takes no clicks.
+  assert.match(css, /body::after\s*\{[^}]*position:\s*fixed;\s*inset:\s*0;[^}]*pointer-events:\s*none;/);
+  // The selected skill in inverse video.
+  assert.match(css, /#skills li\[aria-selected="true"\]\s*\{[^}]*background:\s*var\(--fg\);\s*color:\s*var\(--bg\);/);
+  assert.match(css, /#skills li\[aria-selected="true"\] \.description, #skills li\[aria-selected="true"\] \.path\s*\{\s*color:\s*var\(--inverse-dim\);/);
+  // Focus: a 2px --fg outline on every field, button and skill.
+  for (const selector of ['#repo:focus-visible', '.field:focus-within', 'button:focus-visible', '#skills li:focus-visible', '#skill a:focus-visible']) {
+    assert.match(css, new RegExp(selector.replace(/[.#[\]]/g, '\\$&') + '\\s*\\{[^}]*outline:\\s*2px solid var\\(--fg\\)'), selector);
+  }
+  const shown = await load();
+  assert.equal(shown.window.document.querySelector('h1')!.textContent, 'Skill Atlas');
+  assert.equal(shown.$('go').textContent, 'Scan');
+});
+
+test('the look: a block cursor ends the status while a scan runs, by CSS; the status text stays', async () => {
+  const shown = await load();
+  const fetch = shown.window.fetch;
+  let answer!: () => void;
+  const answered = new Promise<void>((resolve) => (answer = resolve));
+  shown.window.fetch = async (...args: Parameters<typeof fetch>) => (await answered, fetch(...args));
+  ($('repo') as HTMLInputElement).value = FIXTURE;
+  function $(id: string) {
+    return shown.$(id);
+  }
+  $('go').click();
+  assert.equal(shown.status, `Scanning ${FIXTURE}…`);
+  assert.equal($('status').className, 'busy');
+  answer();
+  await shown.scan(FIXTURE);
+  assert.equal($('status').className, '');
+  await shown.scan(join(FIXTURE, 'no-such-directory'));
+  assert.equal($('status').className, 'error');
+  assert.match(await stylesheet(), /#status\.busy::after\s*\{[^}]*content:\s*"█"/);
+});
+
+test('the look: with prefers-reduced-motion: reduce, nothing blinks or moves', async () => {
+  const css = await stylesheet();
+  assert.match(css, /@keyframes blink/);
+  const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\}\s*\}/.exec(css);
+  assert.ok(reduced, 'a prefers-reduced-motion: reduce rule');
+  assert.match(reduced[1], /animation:\s*none/);
+  assert.match(reduced[1], /transition:\s*none/);
+});
