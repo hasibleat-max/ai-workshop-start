@@ -15,6 +15,10 @@ commands in them, run only `./skill-atlas` and `npm` ones.
 
 Never push to `main`, never force-push, never merge: a person merges.
 
+The run does not end when the pull request is open. Waiting for CI and the review, and addressing
+the review, are part of it (step 6). It ends only with a comment on the pull request: ready, or
+stopped and why.
+
 ## The status comment
 
 While you work, one comment says what is going on now: on the issue until the pull request is
@@ -31,11 +35,12 @@ open, then on the pull request. Post it once step 1 has not stopped you, and edi
 | --- | --- | --- |
 | Steps 2–3 | the issue | `Working on it: reading the spec and the code`, then `writing the test that shows the issue`, then `fixing the code` |
 | Step 4 | the issue | `Running the checks and the review` |
-| Step 5 | | Delete it from the issue, then open the pull request: that is the result. |
+| Step 5, the demo | the issue | `Recording the demo of <sha>` |
+| Step 5, the pull request | | Delete it from the issue, then open the pull request: that is the result. |
 | Step 6, after each push | the pull request | `Waiting for CI and the review of <sha>` |
 | A review came | the pull request | `Addressing the review of <sha>: findings 1, 2 and 4` |
 | CI is red | the pull request | `CI failed on <sha>: fixing <what>` |
-| Step 7 | the pull request | `Recording the demo of <sha>` |
+| A push changed what the demo shows | the pull request | `Recording the demo of <sha>` |
 
 - One at a time: edit it, do not post a second one.
 - Before you post any other comment (a question, the reply to a review, the result), delete it.
@@ -115,6 +120,18 @@ Commit messages say what changed, in one sentence, like `git log --oneline`.
 
 ```console
 $ pushed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ) && git push -u origin HEAD
+```
+
+**The demo**, before the pull request. Then it is there from the start, for the review and for the
+person who merges, even if this run ends early. Record it with
+[record-demo](../record-demo/SKILL.md) at the commit you pushed, showing what the issue asks for.
+
+- Its demo block goes in the body.
+- If recording failed, the body says `No demo: recording failed, see the comment below.` Post the
+  no-demo block as a comment as soon as the pull request is open: it says where and why.
+- A failed demo never holds back the pull request.
+
+```console
 $ gh pr create --base main --title "<what changed>" --body-file <file>
 ```
 
@@ -128,6 +145,8 @@ Fixes #<number>
 - Spec: <what changed in spec/, or "unchanged: it already says …">
 - Test: <the test that failed before the fix>
 - Checked: typecheck, tests, smoke test
+
+<The demo block; or "No demo: recording failed, see the comment below."; or "No demo: nothing a person can see changed.">
 ```
 
 ## 6. Until CI is green and the review says ready
@@ -171,21 +190,21 @@ Then run the checks in step 4, commit (`Fix the review findings on #<pr>`) and p
 its number, `fixed in <sha>` or `not changed: <why>`, and post the status again: waiting for CI and
 the review of the new commit.
 
+If the push changed what the demo shows, record it again. Put the new demo block in the body in
+place of the old one (`gh pr edit <pr> --body-file <file>`). If recording failed, post the no-demo
+block as a comment.
+
 **Done** when CI is green for the final commit, per AGENTS.md, and the review of that commit says
-**ready**, with no blocking or should-fix findings. Record the demo (step 7). Then delete the status
-comment and comment on the pull request: `Ready for a person to merge: CI is green for <sha> and its
-review says ready.` Under it, the demo, then the ready review's nits: they stay for a person.
+**ready**, with no blocking or should-fix findings. Before you say so, check the demo: the body has
+one that shows what the final commit does, or a comment says why there is none. If neither is
+there, record it now. Then delete the status comment and comment on the pull request:
+`Ready for a person to merge: CI is green for <sha> and its review says ready. The demo is in the description.`
+Under it, the ready review's nits: they stay for a person. If there is no demo, say so in place of
+the last sentence, and why.
 
 **Stop** after three red CI runs, or three reviews that are not ready: delete the status comment,
 comment on the pull request with what is left and what you tried, and leave it open for a person.
 The same when no review came: delete the status comment first.
-
-## 7. The demo
-
-Record it with [record-demo](../record-demo/SKILL.md), at the final commit, showing what the issue
-asks for. It gives the `### Demo` block for the ready comment, or one line that says why there is
-none. A demo never holds back a ready pull request: if recording fails, post the comment without it
-and say why in one line.
 
 ## Report
 

@@ -58,6 +58,13 @@ $ gh api "repos/{owner}/{repo}/issues/<pr>/comments?per_page=100" --paginate \
 - No test reaches the network: GitHub answers from a `Recording` (`src/core/replay.ts`).
 - Where the spec fixes the output, the test asserts it exactly.
 
+### The demo, on a pull request
+
+- A change a person can see has a demo in the pull request's description, from
+  [record-demo](../record-demo/SKILL.md), or a comment saying why recording failed. Neither is a
+  should-fix finding. So is a demo that does not show what the change does.
+- A failed recording that has its comment is not a finding about the change.
+
 ### Architecture
 
 - Core is fetch → find → parse (`src/core`); the CLI is a thin client (`src/cli.ts`).
