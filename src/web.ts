@@ -4,7 +4,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { AtlasError } from './core/errors.ts';
-import { skillLink } from './core/model.ts';
+import { firstSentence, skillLink } from './core/model.ts';
 import { scan, type Source } from './core/scan.ts';
 
 export type WebOptions = {
@@ -15,18 +15,34 @@ export type WebOptions = {
 /** What `GET /api/scan?repo=<link>` answers: the repository, its skills with their SKILL.md, the warnings. */
 export type WebScan = {
   repository: { id: string; url: string; commit: string };
-  skills: { id: string; name: string; description: string; path: string; link: string; copies: string[]; text: string }[];
+  skills: {
+    id: string;
+    name: string;
+    description: string;
+    /** The description's first sentence, as `scan` prints it. */
+    summary: string;
+    path: string;
+    link: string;
+    copies: string[];
+    text: string;
+  }[];
   warnings: string[];
 };
 
 /** The server, not yet listening. */
 export function createWebServer({ open }: WebOptions): Server {
-  return createServer(async (request, response) => {
+  const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     const send = (status: number, type: string, body: string) => {
       response.writeHead(status, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': 'no-store' });
       response.end(body);
     };
+    // Bound to 127.0.0.1, but a page whose domain resolves there (DNS rebinding) would still be
+    // same-origin: only this machine's own names may ask.
+    const port = (server.address() as AddressInfo).port;
+    if (request.headers.host !== `127.0.0.1:${port}` && request.headers.host !== `localhost:${port}`) {
+      return send(403, 'text/plain', 'Forbidden');
+    }
     if (request.method !== 'GET') return send(405, 'text/plain', 'Method not allowed');
     if (url.pathname === '/') return send(200, 'text/html', PAGE);
     if (url.pathname !== '/api/scan') return send(404, 'text/plain', 'Not found');
@@ -41,6 +57,7 @@ export function createWebServer({ open }: WebOptions): Server {
           id: skill.id,
           name: skill.name,
           description: skill.description,
+          summary: firstSentence(skill.description),
           path: skill.path,
           link: skillLink(result.repository, skill),
           copies: skill.copies,
@@ -54,6 +71,7 @@ export function createWebServer({ open }: WebOptions): Server {
       send(error instanceof AtlasError ? 400 : 500, 'application/json', JSON.stringify({ error: message }));
     }
   });
+  return server;
 }
 
 /** Starts listening on 127.0.0.1; the page's address. Port 0 picks a free one. */
@@ -131,7 +149,11 @@ function status(text, error = false) {
 
 function show(skill) {
   for (const item of $('skills').children) item.setAttribute('aria-selected', String(item.dataset.id === skill.id));
-  const parts = [el('h2', { textContent: skill.name }), el('a', { href: skill.link, textContent: skill.link, target: '_blank', rel: 'noreferrer' })];
+  // An http:// page cannot open a file:// link: a local skill's path is shown as text.
+  const link = skill.link.startsWith('file:')
+    ? el('p', { className: 'path', textContent: skill.path })
+    : el('a', { href: skill.link, textContent: skill.link, target: '_blank', rel: 'noreferrer' });
+  const parts = [el('h2', { textContent: skill.name }), link];
   if (skill.copies.length) parts.push(el('p', { className: 'path', textContent: 'also in ' + skill.copies.join(', ') }));
   parts.push(el('pre', { textContent: skill.text }));
   $('skill').replaceChildren(...parts);
@@ -155,7 +177,7 @@ $('scan').addEventListener('submit', async (event) => {
     $('skills').replaceChildren(...answer.skills.map((skill) => {
       const item = el('li', { role: 'option', tabIndex: 0 },
         el('div', { className: 'name', textContent: skill.name }),
-        el('div', { className: 'description', textContent: skill.description }),
+        el('div', { className: 'description', textContent: skill.summary }),
         el('div', { className: 'path', textContent: skill.path }));
       item.dataset.id = skill.id;
       item.addEventListener('click', () => show(skill));

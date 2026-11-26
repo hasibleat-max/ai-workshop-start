@@ -36,7 +36,7 @@ Review only; change nothing unless the user asks for the fixes.
 
 - Core is fetch → find → parse (`src/core`); the CLI is a thin client (`src/cli.ts`).
 - `src/core`, `src/commands.ts` and `src/browser.ts` serve the browser too: no `node:` imports.
-  Node-only code lives in `src/cli.ts` and `src/local.ts`.
+  Node-only code lives in `src/cli.ts`, `src/local.ts` and `src/web.ts`, the local web view's server.
 - Nothing is stored: no files written, no cache on disk.
 - A failure the user should understand is an `AtlasError`: its message, exit code 1. Any other
   error is a bug.
