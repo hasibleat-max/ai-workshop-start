@@ -177,7 +177,7 @@ const PAGE = `<!doctype html>
   .empty { margin: 64px auto 0; max-width: 360px; padding: 0 24px; color: var(--muted); text-align: center; }
   .empty::before { content: ""; display: block; width: 40px; height: 48px; margin: 0 auto 16px; border: 2px dashed var(--border); border-radius: 8px; }
   /* Narrow windows: one column, the list above the SKILL.md pane, and the page scrolls. */
-  @media (max-width: 719px) {
+  @media (width < 720px) {
     body { height: auto; min-height: 100vh; }
     header { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
     main { grid-template-columns: 1fr; }

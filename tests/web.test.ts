@@ -625,7 +625,7 @@ test('the look: a scan in progress shows a spinner before the status, by CSS; th
 
 test('the look: under 720 px wide, the list above the SKILL.md pane, and the page scrolls', async () => {
   const css = await stylesheet();
-  const narrow = /@media \(max-width: 719px\)\s*\{([\s\S]*?)\}\s*\}/.exec(css);
+  const narrow = /@media \(width < 720px\)\s*\{([\s\S]*?)\}\s*\}/.exec(css);
   assert.ok(narrow, 'a rule for narrow windows');
   assert.match(narrow[1], /body\s*\{[^}]*height:\s*auto;/);
   assert.match(narrow[1], /main\s*\{[^}]*grid-template-columns:\s*1fr;/);
