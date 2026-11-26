@@ -108,7 +108,11 @@ const PAGE = `<!doctype html>
   #warnings { margin: 4px 0 0; padding-left: 20px; color: #d97706; }
   main { flex: 1; display: grid; grid-template-columns: minmax(240px, 1fr) 2fr; min-height: 0; }
   #list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
-  #filter { flex: none; margin: 8px 16px; }
+  /* The field's frame holds the filter and its counter side by side: the text and the clear button end before it. */
+  .field { flex: none; display: flex; align-items: center; margin: 8px 16px; border: 1px solid var(--border); border-radius: 6px; }
+  .field:focus-within { outline: auto; }
+  #filter { min-width: 0; border: 0; outline: none; }
+  #counter { flex: none; padding-right: 10px; color: var(--muted); font-size: 12px; white-space: nowrap; }
   #skills { flex: 1; list-style: none; margin: 0; padding: 0; overflow: auto; border-top: 1px solid var(--border); }
   #skills li { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
   #skills li:hover { background: #8881; }
@@ -136,7 +140,10 @@ const PAGE = `<!doctype html>
 </header>
 <main>
   <div id="list">
-    <input id="filter" type="search" placeholder="Filter the skills" aria-label="Filter the skills" autocomplete="off" disabled>
+    <div class="field">
+      <input id="filter" type="search" placeholder="Filter the skills" aria-label="Filter the skills" autocomplete="off" disabled>
+      <span id="counter" aria-hidden="true" hidden></span>
+    </div>
     <ul id="skills" role="listbox" aria-label="Skills"></ul>
   </div>
   <section id="skill" aria-label="SKILL.md"><p class="empty">Scan a repository, then pick a skill to read its SKILL.md.</p></section>
@@ -152,6 +159,11 @@ function el(tag, props = {}, ...children) {
 function status(text, error = false) {
   $('status').textContent = text;
   $('status').className = error ? 'error' : '';
+}
+
+function counter(text) {
+  $('counter').textContent = text;
+  $('counter').hidden = !text;
 }
 
 // The last scan's answer and the selected skill's id; the filter only narrows what that answer has.
@@ -195,6 +207,8 @@ function render() {
   const skills = query ? answer.skills.filter((skill) => has(skill.name) || has(skill.path) || has(skill.text)) : answer.skills;
   const total = answer.skills.length;
   status(answer.repository.id + ' · ' + (query ? skills.length + ' of ' : '') + total + (total === 1 ? ' skill' : ' skills'));
+  // The same count by the field; the status already announces it.
+  counter(query ? skills.length + ' of ' + total : '');
   $('skills').replaceChildren(...skills.map((skill) => {
     const item = el('li', { role: 'option', tabIndex: 0 },
       el('div', { className: 'name', textContent: skill.name }),
@@ -222,6 +236,7 @@ $('scan').addEventListener('submit', async (event) => {
   $('go').disabled = true;
   $('filter').value = '';
   $('filter').disabled = true;
+  counter('');
   answer = null;
   selected = null;
   $('skills').replaceChildren();

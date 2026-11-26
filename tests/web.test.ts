@@ -69,6 +69,11 @@ async function load() {
     get status() {
       return $('status').textContent;
     },
+    /** The filter field's counter; null when there is none. */
+    get counter() {
+      const counter = $('counter');
+      return counter.hidden ? null : counter.textContent;
+    },
     get error() {
       return $('status').className === 'error';
     },
@@ -399,4 +404,38 @@ test('the filter: nothing fetched, nothing stored', async () => {
   assert.equal(shown.window.localStorage.length, 0);
   assert.equal(shown.window.sessionStorage.length, 0);
   assert.equal(shown.filterField.autocomplete, 'off');
+});
+
+test('the filter: a counter in the field, n of total, as you type; none when empty; a new scan clears it; not announced', async () => {
+  const shown = await load();
+  assert.equal(shown.counter, null);
+  await shown.scan(FIXTURE);
+  assert.equal(shown.counter, null);
+  assert.equal(shown.$('counter').getAttribute('aria-hidden'), 'true');
+  assert.equal(shown.$('counter').parentElement, shown.filterField.parentElement);
+  // On ./fixture, as in the issue's table.
+  for (const [filter, counter] of [
+    ['commit', '2 of 5'],
+    ['TABS', '1 of 5'],
+    ['.agents/', '2 of 5'],
+    ['no-such-skill', '0 of 5'],
+    ['', null],
+    ['   ', null],
+  ] as const) {
+    shown.filter(filter);
+    assert.equal(shown.counter, counter, filter);
+    // The status line's numbers.
+    assert.equal(shown.status, counter ? `fixture · ${counter} skills` : 'fixture · 5 skills', filter);
+  }
+  // As you type: c is in every skill's SKILL.md, co only in code-style's and commits'.
+  assert.deepEqual(['c', 'co', 'com'].map((typed) => shown.filter(typed).counter), ['5 of 5', '2 of 5', '2 of 5']);
+  // The status line stays, with the same numbers.
+  assert.equal(shown.status, 'fixture · 2 of 5 skills');
+  await shown.scan(FIXTURE);
+  assert.equal(shown.counter, null);
+  shown.filter('commit');
+  await shown.scan(join(FIXTURE, 'no-such-directory'));
+  assert.equal(shown.counter, null);
+  const one = await page('https://github.com/JetBrains/indented');
+  assert.equal(one.filter('linter').counter, '1 of 1');
 });
