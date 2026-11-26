@@ -13,6 +13,11 @@ Listens on **127.0.0.1 only**, and answers only `Host: 127.0.0.1:<port>` or `loc
   - As you type, only the skills whose name, path (not its copies') or SKILL.md text contains the filter, ignoring
     case and the spaces around it; still sorted by name. It filters what `/api/scan` returned: nothing is fetched
   - The status: `<repository> · <n> of <total> skills` (`1 of 1 skill`); an empty filter → every skill, the status as above
+  - The **counter**, at the right end of the filter field while the filter has text: `<n> of <total>`, the status's
+    numbers (skills shown, not matches). An empty filter (or only spaces) → no counter; a new scan clears the filter,
+    so the counter goes too. It updates as you type; small and muted, like the paths. The typed text and the field's
+    clear button never run under it. Not announced (`aria-hidden="true"`): screen readers hear the count from the
+    status (`role="status"`)
   - Under each skill shown, **what it found**: the first line of its SKILL.md that has the filter, trimmed,
     each match in it marked (`<mark>`). No line when the SKILL.md does not have it (a match in the path only)
   - The SKILL.md pane keeps the selected skill if it still matches, else shows the first skill shown;
